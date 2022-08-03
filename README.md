@@ -1,7 +1,7 @@
 # SuperInfer
 Scripts by Paul Jay
 
-SuperInfer is a collection of scripts to dissect the variation on genetic structure along the genome. Its first aim is to detect region of the genome that may include inversion polymorphisms or supergenes, but it can be used to detect any peculiar change in population genomic structure. For instance, it can probably highlight centromeric regions and regions that have been recently introgressed.
+SuperInfer is a collection of scripts to dissect the variation of genetic structure along the genome. Its first aim is to detect regions of the genome that may include inversion polymorphisms or supergenes, but it can be used to detect any peculiar change in population genomic structure. For instance, it can probably highlight centromeric regions and regions that have been recently introgressed.
 
 Currently, this method is based on population genetic data, e.g. resulting from short-read sequencing, and therefore detects genetic regions with particular genetic structure based on peculiar pattern of linkage disequilibrium among group of samples in population. Consequently, it cannot be used by itself to detect with certainty a chromosomal inversion, as it does not analyse sequence orientation. However, it could provide converging lines of evidence that a genomic region may harbour a chromosomal rearrangement, which may allow to specifically focus on this region for further analyses (e.g. analysing read mapping orientation)  
 
