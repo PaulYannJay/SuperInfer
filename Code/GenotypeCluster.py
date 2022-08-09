@@ -279,7 +279,7 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 			print("Fatal error: The window: ", Start, "-", Start+WindSize, " contain NaN values")
 			sys.exit()
 		if (Method in "pca"): #If the clusteting must be perform on pca output
-			estimatedSilhou, Cluster, PC, ClusterCenter=estimate_SilhouetteScoreWithPCA(Array,MaxCluster) #Perform the PCA, the clustering and estimate the silhouette score for 2<=k<=MaxCluster
+			estimatedSilhou, Cluster, PC, ClusterCenterList=estimate_SilhouetteScoreWithPCA(Array,MaxCluster) #Perform the PCA, the clustering and estimate the silhouette score for 2<=k<=MaxCluster
 			write_pca(PC, WindowPos);
 		else: #Perform the clusting directly on genotype
 		#	start_time = time.time()
