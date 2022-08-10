@@ -13,23 +13,27 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.metrics import davies_bouldin_score 
 from sklearn.metrics.pairwise import distance_metrics
 from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.metrics import pairwise_distances
 import numpy as np
-usage='''//////////////////////////////////////////
-Script usage
-python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison]
+usage='''
 
-The Genotypefile.geno file is in the format "Scaf Position GenotypeCodeSample1 GenotypeCodeSample2 ... GenotypeCodeSampleN" with genotype code being 0 for 0/0, 1 for 0/1 and 2 for 1/1 (only biallelic). All position must be genotyped (no "NA"). From a vcf file, to obtain it: 
+//////////////////////////////////////////
+Script usage:
+python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison] [-f Silhouette]
+
+Help: The Genotypefile.geno file is in the format "Scaf Position GenotypeCodeSample1 GenotypeCodeSample2 ... GenotypeCodeSampleN" with genotype code being 0 for 0/0, 1 for 0/1 and 2 for 1/1 (only biallelic). All position must be genotyped (no "NA"). From a vcf file, to obtain it: 
 	1 first, impute the genotype with beagle (eg. java -Xmx20g -jar ~/Software/beagle.05May22.33a.jar  gt=data.vcf.gz out=data.imputed.vcf window=1 overlap=0.5
 	2. Transform to .geno file: python3 vcf2geno.py -i data.imputed.vcf.gz -o data.imputed.geno
 The WindowSize must be an integer. It defines the size of the windows
 The WindowSlide must be an integer. It define the extent of the slide of windows
 The -t parameter defines wheter the window size is in variant number or in base pair. For variant number, use "-t variant". For base pair, use "-t bp".
-The MaxNumberOfCluster must be an integer. It defines the maximum number of cluster for which the silhouette score will be calculated. For instance, if "-k 6" is used, the script will output, for each window, the silhouette score of k=2,k=3,k=4,k=5 and k=6  
+The MaxNumberOfCluster must be an integer. It defines the maximum number of cluster that will be determined and for which the clustering score will be calculated. For instance, if "-k 6" is used, the script will output, for each window, the clustering score of k=2,k=3,k=4,k=5 and k=6  
+By default, the clustering score used is the Davies Bouldin score. To compute the Silhouette score instead, use "-f Silhouette"
 If "-p" is specified, the clustering is done on pca output instead on directly on genotype. So first the script compute pca, and then use Number_of_pca axes to do the clustering. Number_of_pca must be an integer.
 If "-a pca" is specified, the clustering is done on genotype, but the pca are also computed and provided as an output
 If "-a dxy" is specified, the script compute Dxy between each cluster. Be careful this can be pretty time comsuming. The euclidean distance calculated by the script between all cluster give a very similare result that Dxy and is much faster to compute
@@ -39,7 +43,7 @@ If "-a pi" is specified, the script compute Pi of each cluster. Be careful this 
 '-o' specify the prefix of the output files
 
 Output:
-OutputFile.Silhou --> The silhouette score for each k, for each window 
+OutputFile.ClustScore --> The clutering score (Silhouette score or davies bouldin's score) for each k, for each window 
 OutputFile.Hetero --> The proportion of heterozygous and homozygous site (only variant) in each cluster, for each number of cluster, for each window. If "-a Pi" is provided, this file also contains the result of Pi calculation
 OutputFile.pca --> The position of each sample on each pca axes, for each window
 OutputFile.cluster --> The affiliation of each sample (the cluster they belong to), for each number of cluster, for each window
@@ -47,6 +51,7 @@ OutputFile.clusterDistance --> The euclidian distance between each cluster, for 
 OutputFile.Dxy --> The nucleotide distance between each cluster, for each number of cluster, for each window
 
 ////////////////////////////////////////////////
+
 '''
 
 
@@ -61,6 +66,7 @@ def main(argv):
 	global NoAxe 
 	#global options 
 	global optionPCA
+	global ScoreFct 
 	global optionDXY
 	global MaxCompar 
 	global optionPI
@@ -69,10 +75,11 @@ def main(argv):
 	optionPI=False
 	Method="direct"
 	options="none"
+	ScoreFct=davies_bouldin_score
 	NoAxe=10 #Default number of pca axes used for clustering (if "-p" is specified)
 	MaxCompar=100 #Default number of comparison used for the computation of Dxy and Pi
 	try:
-		opts, args = getopt.getopt(argv,"hg:o:w:s:k:t:k:m:i:p:a:c:")
+		opts, args = getopt.getopt(argv,"hg:o:w:s:k:t:k:m:i:p:a:c:f:")
 	except getopt.GetoptError:
 		print('One of the option do not exist !\n', usage)
 		sys.exit(2)
@@ -99,10 +106,16 @@ def main(argv):
 			if (arg in "variant" or arg in "bp"):
 				WindType = arg
 			else:
-				print("Window type must be 'variant' or 'bp'\n", usage)
+				print("Error: Window type must be 'variant' or 'bp'\n", usage)
+				sys.exit()
+		elif opt in ("-f"):
+			if (arg in "Silhouette"):
+				ScoreFct = silhouette_score
+			else:
+				print("Error: the alternative score function must be 'Silhouette'\n", usage)
 				sys.exit()
 		elif opt in ("-a"):
-			print(arg)
+			print("Option(s) used:", arg)
 			Options=arg.split(',')
 			if ("pca" in Options or "dxy" in Options or "pi" in Options):
 				if ("pca" in Options):
@@ -137,21 +150,12 @@ def Apply_Kmeans(Input,n_cluster):
 	wt_kmeansclus = kmeans.predict(Input) #No weight
 	return wt_kmeansclus, kmeans.cluster_centers_
 
-def Calculate_SilhouetteScore(Input, Kmeans_output):
+def Define_Cluster_and_Score_WithPCA(Data, MaxCluster, ScoreFct):
 	'''
-	Function to compute the silhouete score (input: array of genotype or position on pca axes, Cluster defined by Kmean; output=silhouete score)
-	'''
-	silhouette_avg = silhouette_score(Input, Kmeans_output) 
-	return silhouette_avg
-
-
-
-def estimate_SilhouetteScoreWithPCA(Data, MaxCluster):
-	'''
-	Calculate the silhouette score for different k on pca Output (first compute pca, the Silhouette score) with k between 2 and MaxCluster (input: array of genotype or position on pca axes, Number of cluster ;output: Array of silhouette score, list of cluster attribution, Position of sample on PC, Cluster centers)
+	Calculate the silhouette score for different k on pca Output (first compute pca, then the clustering score) with k between 2 and MaxCluster (input: array of genotype or position on pca axes, Number of cluster ;output: Array of clustering score score for each k, list of cluster attribution, Position of sample on PC, Cluster centers)
 	'''
 	Clusters = list(range(2,MaxCluster+1)) #Number of cluster to calculate. (e.g. if "-k 5" is provided, the analyses are done for 2,3,4 and 5 clusters
-	SilhouetteList=[]
+	ScoreList=[]
 	ClusterList=[]
 	ClusterCenterList=[]
 	PCAaxes=min(np.shape(Data)[1], NoAxe) #Number of PCA axis to return
@@ -161,16 +165,17 @@ def estimate_SilhouetteScoreWithPCA(Data, MaxCluster):
 		KMOut=np.append(cluster,KM) #Append the result to the list # Why using a numpy array ? To be tested
 		ClusterList.append(KMOut)#KMOut=np.concatenate((Pref,NoPc[:, None],PC), axis=1)
 		ClusterCenterList.append(ClusterCenter) #List of Cluster center
-		Silhou = Calculate_SilhouetteScore(PC, KM) #Calculate the silhouette scire
-		SilhouetteList.append(Silhou)
-	return SilhouetteList,ClusterList,PC,ClusterCenterList
+		Score= ScoreFct(PC, KM) #Calculate the score of the clustering (by default, DBS) 
+		ScoreList.append(DBS)
+	return ScoreList,ClusterList,PC,ClusterCenterList
 
-def estimate_SilhouetteScoreWithoutPCA(Data, MaxCluster):
+
+def Define_Cluster_and_Score_WithoutPCA(Data, MaxCluster, ScoreFct):
 	'''
 	Calculate the silhouette score for different k, with k between 2 and MaxCluster (input: array of genotype or position on pca axes, Number of cluster ; output: Array of silhouette score, list of cluster attribution, Cluster centers)
 	'''
 	Clusters = list(range(2,MaxCluster+1))#Number of cluster to calculate. (e.g. if "-k 5" is provided, the analyses are done for 2,3,4 and 5 clusters
-	SilhouetteList=[]
+	ScoreList=[]
 	ClusterList=[]
 	ClusterCenterList=[]
 	for cluster in Clusters: #For each number of cluster
@@ -178,9 +183,9 @@ def estimate_SilhouetteScoreWithoutPCA(Data, MaxCluster):
 		KMOut=np.append(cluster,KM) #Store the result
 		ClusterList.append(KMOut) #List of cluster centroid
 		ClusterCenterList.append(ClusterCenter)
-		Silhou = Calculate_SilhouetteScore(Data, KM) #Calculate the silhouette score
-		SilhouetteList.append(Silhou)
-	return SilhouetteList, ClusterList,ClusterCenterList
+		Score = ScoreFct(Data, KM) #Calculate the score of the clustering (by default, DBS)
+		ScoreList.append(Score)
+	return ScoreList, ClusterList,ClusterCenterList
 
 def Compute_Heterozygosity(Geno, WindowPos, Cluster):
 	''' Function to estimate the number of heterozygous and homozygous site in each cluster. (Input: Array of genotype, WindowPosition, List of cluster attribution; output: Directly write the result'''
@@ -279,11 +284,11 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 			print("Fatal error: The window: ", Start, "-", Start+WindSize, " contain NaN values")
 			sys.exit()
 		if (Method in "pca"): #If the clusteting must be perform on pca output
-			estimatedSilhou, Cluster, PC, ClusterCenterList=estimate_SilhouetteScoreWithPCA(Array,MaxCluster) #Perform the PCA, the clustering and estimate the silhouette score for 2<=k<=MaxCluster
+			ScoreList, Cluster, PC, ClusterCenterList=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster
 			write_pca(PC, WindowPos);
 		else: #Perform the clusting directly on genotype
 		#	start_time = time.time()
-			estimatedSilhou, Cluster, ClusterCenterList=estimate_SilhouetteScoreWithoutPCA(Array,MaxCluster) #Perform clustering and estimate the silhouette score for 2<=k<=6
+			ScoreList, Cluster, ClusterCenterList=Define_Cluster_and_Score_WithoutPCA(Array,MaxCluster, ScoreFct) #Perform clustering and estimate the silhouette score for 2<=k<=6
 		#	print("--- %s seconds:Silhou ---" % (time.time() - start_time))
 			if (optionPCA): #if pca in "options', compute pca, but don't use them to compute the cluster
 				PC=Apply_PCA(Array,NoAxe)
@@ -296,16 +301,16 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 		if (optionDXY):
 		#	start_time = time.time()
 			Compute_Dxy(Array, WindowPos, Cluster,MaxCompar)
-		Line=np.concatenate((WindowPos,estimatedSilhou))
+		Line=np.concatenate((WindowPos,ScoreList))
 	else:
 		Line=np.concatenate((WindowPos,["NA"]*(MaxCluster - 1)))
 	for element in Line:
-		textfile.write(str(element) + " ")
-	textfile.write("\n")
+		textfileClustScore.write(str(element) + " ")
+	textfileClustScore.write("\n")
 
 def Sliding_window_bp_overlap(File, WindSize, Slide): 
 	'''
-	Function to split the .geno file in window and calculate the silhoutette score or other state in each window (parameter: window size. Input: genotype array, Output: Silhouette scores in each window) 
+	Function to split the .geno file in window and calculate the silhoutette score or other state in each window (parameter: window size. Input: genotype array, Output: Clustering scores in each window) 
 	The function read the geno file line by line, so it can deal with very large file.
 	Slide on bp
 	'''
@@ -346,7 +351,7 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 								
 def Sliding_window_variant_overlap(File, WindSize, slide): 
 	'''
-	Function to split the .geno file in window and calculate the silhoutette score or other state in each window (parameter: window size. Input: genotype array, Output: Silhouette scores in each window) 
+	Function to split the .geno file in window and calculate the silhoutette score or other state in each window (parameter: window size. Input: genotype array, Output: Clustering scores in each window) 
 	The function read the geno file line by line, so it can deal with very large file.
 	Slide on variant
 	'''
@@ -415,11 +420,11 @@ def write_pca(PC, WindowPos):
 		textfilepca.write("\n")
 
 def write_header(MaxCluster):
-	textfile.write("Scaffold Start End No.variants")
+	textfileClustScore.write("Scaffold Start End No.variants")
 	Clusters = list(range(2,MaxCluster+1))
 	for cluster in Clusters:
-		textfile.write(" k" + str(cluster))
-	textfile.write("\n")
+		textfileClustScore.write(" k" + str(cluster))
+	textfileClustScore.write("\n")
 
 def write_headerPCA():
 	with open(GenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
@@ -443,7 +448,7 @@ def write_headerCluster():
 if __name__ == "__main__":
 	main(sys.argv[1:])
 			
-textfile = open(OutputFile+".Silhou", "w")
+textfileClustScore = open(OutputFile+".ClustScore", "w")
 textfileCluster = open(OutputFile+".cluster", "w")
 textfileHetero = open(OutputFile+".Hetero", "w")
 textfileHetero.write("Scaffold Start End No.variants No.cluster Cluster Hetero Homo")
