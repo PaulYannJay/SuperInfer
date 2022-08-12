@@ -146,7 +146,8 @@ def Apply_Kmeans(Input,n_cluster):
 	'''
 	Function to compute k-means (input: array of genotype of n samples or array of position of sample on n pca axes, number of cluster to compute; output: array of cluster attribution for each sample, depending on n_cluster [n_cluster rows, n columns], Center of clusters)
 	'''
-	kmeans = KMeans(n_clusters=n_cluster, random_state=0, max_iter=1000).fit(Input) #Effect of max_iter not properly tested
+	#kmeans = KMeans(n_clusters=n_cluster).fit(Input) #Effect of max_iter not properly tested
+	kmeans = KMeans(n_clusters=n_cluster).fit(Input) #Effect of max_iter not properly tested
 	wt_kmeansclus = kmeans.predict(Input) #No weight
 	return wt_kmeansclus, kmeans.cluster_centers_
 
@@ -179,11 +180,15 @@ def Define_Cluster_and_Score_WithoutPCA(Data, MaxCluster, ScoreFct):
 	ClusterList=[]
 	ClusterCenterList=[]
 	for cluster in Clusters: #For each number of cluster
-		KM, ClusterCenter=Apply_Kmeans(Data,cluster) #Calculate Kmean
+	#	start_time = time.time()
+		KM, ClusterCenter=Apply_Kmeans(Data,cluster) #Calculate Kmean #Note that this is the time consuming step
+	#	print("--- %s seconds:Kmeans ---" % (time.time() - start_time))
 		KMOut=np.append(cluster,KM) #Store the result
 		ClusterList.append(KMOut) #List of cluster centroid
 		ClusterCenterList.append(ClusterCenter)
+		#start_time = time.time()
 		Score = ScoreFct(Data, KM) #Calculate the score of the clustering (by default, DBS)
+		#print("--- %s seconds:Score ---" % (time.time() - start_time))
 		ScoreList.append(Score)
 	return ScoreList, ClusterList,ClusterCenterList
 
@@ -277,7 +282,7 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 	''' This is the main fonction the call the different function to perform different analyses'''
 	WindowPos=[CurrScaffold,Start,End, np.shape(Array)[0]] #Position of the window 
 	if np.shape(Array)[0]>4: #Verify that their is at least n loci in the window (if not, can't compute PCA with 10 axes)
-		Pos=Array[:,1].astype(float) #Grep the position of the loci in the window 
+		#Pos=Array[:,1].astype(float) #Grep the position of the loci in the window 
 		Array=Array[:,2:] #Grep only the genotype at each loci in the window (i.e. remove the loci positon and scaffold)
 		Array=Array.astype(float).transpose() #Define genotye as float and transpose the matrix
 		if(np.isnan(Array).any()): #No "NA" is allowed in the geno file
@@ -327,11 +332,11 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 			if (new_array[0] == CurrScaffold and int(new_array[1]) <= (Start+WindSize)): #If the loci is on the same scaffold and within the current window
 				Array.append(new_array)#Append the main array with the genotype at this position
 			else: #The variant not fall in the current window. It could be on another scaffold or in a next window on the same scaffold. We write the result of the analyse for this window and move to the next window
-				start_time = time.time()
+	#			start_time = time.time()
 				print("Current position: Scaffold=", CurrScaffold, " Position=", Start)
 				ArrayNP=np.asarray(Array) #Create a numpy array from the main array 
 				End=Start+WindSize
-				#Compute_analyses(ArrayNP, CurrScaffold, Start, End)
+				Compute_analyses(ArrayNP, CurrScaffold, Start, End)
 				if (new_array[0] == CurrScaffold): #If the loci was on the same scaffold but not on the current window
 					Array= [x for x in Array if float(x[1])>Start+Slide]
 					NumberEmpty=((int(new_array[1])-(Start+WindSize)) // Slide) #Number of empty window
@@ -349,7 +354,7 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 					Array.append(new_array) #push the first loci in the new array
 					CurrScaffold = new_array[0] #Define the new scaffold/chromosome. If the loci was on the same scaffold, this does noit change anything.
 					Start=(int(new_array[1]) // WindSize) * WindSize # Start for sliding window (not 1 or the position of the first variant).  
-				print("--- %s seconds:Silhou ---" % (time.time() - start_time))
+	#			print("--- %s seconds:Silhou ---" % (time.time() - start_time))
 								
 def Sliding_window_variant_overlap(File, WindSize, slide): 
 	'''
