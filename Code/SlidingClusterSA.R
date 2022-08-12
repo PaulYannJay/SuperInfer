@@ -47,7 +47,7 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 # pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
 
 #Sihouete Score
-Silhou=read.table(paste0(file,".Silhou"), stringsAsFactors = F, header=T)
+Silhou=read.table(paste0(file,".ClustScore"), stringsAsFactors = F, header=T)
 SilhouLong=Silhou %>% group_by(Scaffold, Start, End) %>% pivot_longer(cols = starts_with("k"), names_to="k", values_to="Silhouette_score")
 SilhouLongSub=subset(SilhouLong, (SilhouLong$No.variants>5))
 SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)/abs(min(Silhouette_score)))/mean(Silhouette_score))
@@ -65,9 +65,12 @@ Quant95=quantile(HetMax$minmaxHet, 0.95)
 HetMaxSup95=HetMax[HetMax$minmaxHet > Quant95,]
 
 #Dxy
-DxyData=read.table(paste0(file,".Dxy"), stringsAsFactors = F, header=T,fill=T)
-DxyMax=DxyData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Dxy))
-DxyMax3Clus=subset(DxyMax, DxyMax$No.cluster==3)
+if(file.exists(paste0(file,".Dxy")))
+	{
+	DxyData=read.table(paste0(file,".Dxy"), stringsAsFactors = F, header=T,fill=T)
+	DxyMax=DxyData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Dxy))
+	DxyMax3Clus=subset(DxyMax, DxyMax$No.cluster==3)
+}
 
 #Cluster Distance
 DistanceData=read.table(paste0(file, ".ClusterDistance"), stringsAsFactors = F, header=T, fill=T)
@@ -91,7 +94,7 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     geom_hline(yintercept = Quant95, color="red3", alpha=1,linetype="dashed", size=0.1)+
     geom_line(aes(x=Start, y=minmaxHet), color=Col[1])+
     geom_point(data=HetMaxSup95[HetMaxSup95$Scaffold==Scaff,], aes(x=Start, y=-quantile(HetMax$minmaxHet,0.5)), color="red3", shape=8, size=0.2)+
-    xlab("Position on chr")
+    xlab("Position on chr")+ylab("MaxHet/MinHet")+
     ThemeSobr
   
   base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
@@ -106,7 +109,7 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
                     0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Silhouette_score),
                   fill=k), alpha=1.0)+
     scale_fill_manual(values=Col)+ 
-    xlab("Position on chr")+ylab("Silhouette score")+
+    xlab("Position on chr")+ylab("Clustering score")+
     ThemeSobr
   
   base=ggplot(DistanceMax3Clus[DistanceMax3Clus$Scaffold==Scaff,])
@@ -116,16 +119,26 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     theme(legend.position = "none")+
     ThemeSobr
   
-  base=ggplot(DxyMax3Clus[DxyMax3Clus$Scaffold==Scaff,])
-  DXYPlot= base+
+  if(file.exists(paste0(file,".Dxy")))
+	{ 
+	base=ggplot(dxymax3clus[dxymax3clus$scaffold==scaff,])
+  	dxyplot= base+
     geom_line(aes(x=Start+(End-Start)/2, y=MaxDist), color=Col[3])+
     xlab("Position on chr")+ylab("Dxy")+
     theme(legend.position = "none")+
     ThemeSobr
+	}
   
-
-  plots <- align_plots(PCAplot,SILHOUplot,HETplot,DXYPlot,DISTPlot, align = 'vh', axis = 'lrtb')
-  PLOTS=plot_grid(plots[[1]],plots[[2]],plots[[3]],plots[[4]],plots[[5]],nrow = 5, labels = "auto")
-  
-  save_plot(paste0(file,".",Scaff,".png"),PLOTS, nrow = 5, base_aspect_ratio = 5)
+  if(file.exists(paste0(file,".Dxy")))
+	{
+ 	plots <- align_plots(PCAplot,SILHOUplot,HETplot,DXYPlot,DISTPlot, align = 'vh', axis = 'lrtb')
+  	PLOTS=plot_grid(plots[[1]],plots[[2]],plots[[3]],plots[[4]],plots[[5]],nrow = 5, labels = "auto")
+    save_plot(paste0(file,".",Scaff,".png"),PLOTS, nrow = 5, base_aspect_ratio = 5)
+	}
+  else
+	{
+ 	plots <- align_plots(PCAplot,SILHOUplot,HETplot,DISTPlot, align = 'vh', axis = 'lrtb')
+  	PLOTS=plot_grid(plots[[1]],plots[[2]],plots[[3]],plots[[4]],nrow = 4, labels = "auto")
+    save_plot(paste0(file,".",Scaff,".png"),PLOTS, nrow = 4, base_aspect_ratio = 5)
+	}
 }
