@@ -317,37 +317,39 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 	with open(File) as infile: #Read line by line (i.e. do not load the file in memory)
 		next(infile)#Skip header 
 		secondline=next(infile)# Get the first line of the data to store info
-		Array=[secondline.split()] #create an empty array that will be used to store the genotype of individual in each window
-		Array=np.asarray(Array) #Create a numpy array from the main array 
-		CurrScaffold=Array[0,0]
-		Start=(int(Array[0,1]) // WindSize) * WindSize # Start for sliding window (not 1 or the position of the first variant).  
-		print(Start)
+		Array=[] #create an empty array that will be used to store the genotype of individual in each window
+		new_array=secondline.split()#Create an array from the genotype at this position (split on white space)
+		Array.append(new_array) #push the first loci in the new array
+		Start=(int(new_array[1]) // WindSize) * WindSize # Start for sliding window (not 1 or the position of the first variant).  
+		CurrScaffold=new_array[0]
 		for line in infile: #For each genotype position
 			new_array=line.split()#Create an array from the genotype at this position (split on white space)
 			if (new_array[0] == CurrScaffold and int(new_array[1]) <= (Start+WindSize)): #If the loci is on the same scaffold and within the current window
-				Array=np.vstack((Array,[new_array]))
+				Array.append(new_array)#Append the main array with the genotype at this position
 			else: #The variant not fall in the current window. It could be on another scaffold or in a next window on the same scaffold. We write the result of the analyse for this window and move to the next window
+				start_time = time.time()
 				print("Current position: Scaffold=", CurrScaffold, " Position=", Start)
+				ArrayNP=np.asarray(Array) #Create a numpy array from the main array 
 				End=Start+WindSize
-				#Compute_analyses(Array, CurrScaffold, Start, WindSize)
-				Compute_analyses(Array, CurrScaffold, Start, End)
+				#Compute_analyses(ArrayNP, CurrScaffold, Start, End)
 				if (new_array[0] == CurrScaffold): #If the loci was on the same scaffold but not on the current window
-					Array=Array[Array[:,1].astype(float) > Start+Slide,] #Subset the array do remove the position not in the next window
+					Array= [x for x in Array if float(x[1])>Start+Slide]
 					NumberEmpty=((int(new_array[1])-(Start+WindSize)) // Slide) #Number of empty window
 					Start=Start+Slide #Change the start position of the window
 					End=Start+WindSize
 					for Wind in list(range(0,NumberEmpty)): #Write empty window
-						Compute_analyses(Array, CurrScaffold, Start, End)
+						ArrayNP=np.asarray(Array) #Create a numpy array from the main array 
+						Compute_analyses(ArrayNP, CurrScaffold, Start, End)
 						Start=Start+Slide #Change the start position of the window
 						End=Start+WindSize
-						Array=Array[Array[:,1].astype(float) > Start,] #Subset the array do remove the position not in the next window
-					Array=np.vstack((Array,[new_array]))#Add the new Postion to the array
+						Array= [x for x in Array if float(x[1])>Start]
+					Array.append(new_array)#Append the main array with the genotype at this position
 				else: #The window fall in a new scaffold
 					Array=[] #Reinitialise the main array (new window)
 					Array.append(new_array) #push the first loci in the new array
-					Array=np.asarray(Array) #Create a numpy array from the main array 
 					CurrScaffold = new_array[0] #Define the new scaffold/chromosome. If the loci was on the same scaffold, this does noit change anything.
 					Start=(int(new_array[1]) // WindSize) * WindSize # Start for sliding window (not 1 or the position of the first variant).  
+				print("--- %s seconds:Silhou ---" % (time.time() - start_time))
 								
 def Sliding_window_variant_overlap(File, WindSize, slide): 
 	'''
