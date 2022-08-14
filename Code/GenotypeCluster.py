@@ -2,6 +2,7 @@
 ##### Code by Paul Jay #####
 
 import sys
+import os 
 import getopt
 import pandas as pd
 import random
@@ -24,23 +25,22 @@ usage='''
 
 //////////////////////////////////////////
 Script usage:
-python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison] [-f Silhouette]
+python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison] [-f Silhouette] [-S SampleList]
 
-Help: The Genotypefile.geno file is in the format "Scaf Position GenotypeCodeSample1 GenotypeCodeSample2 ... GenotypeCodeSampleN" with genotype code being 0 for 0/0, 1 for 0/1 and 2 for 1/1 (only biallelic). All position must be genotyped (no "NA"). From a vcf file, to obtain it: 
-	1 first, impute the genotype with beagle (eg. java -Xmx20g -jar ~/Software/beagle.05May22.33a.jar  gt=data.vcf.gz out=data.imputed.vcf window=1 overlap=0.5
-	2. Transform to .geno file: python3 vcf2geno.py -i data.imputed.vcf.gz -o data.imputed.geno
-The WindowSize must be an integer. It defines the size of the windows
-The WindowSlide must be an integer. It define the extent of the slide of windows
-The -t parameter defines wheter the window size is in variant number or in base pair. For variant number, use "-t variant". For base pair, use "-t bp".
-The MaxNumberOfCluster must be an integer. It defines the maximum number of cluster that will be determined and for which the clustering score will be calculated. For instance, if "-k 6" is used, the script will output, for each window, the clustering score of k=2,k=3,k=4,k=5 and k=6  
-By default, the clustering score used is the Davies Bouldin score. To compute the Silhouette score instead, use "-f Silhouette"
-If "-p" is specified, the clustering is done on pca output instead on directly on genotype. So first the script compute pca, and then use Number_of_pca axes to do the clustering. Number_of_pca must be an integer.
-If "-a pca" is specified, the clustering is done on genotype, but the pca are also computed and provided as an output
-If "-a dxy" is specified, the script compute Dxy between each cluster. Be careful this can be pretty time comsuming. The euclidean distance calculated by the script between all cluster give a very similare result that Dxy and is much faster to compute
-If "-a pi" is specified, the script compute Pi of each cluster. Be careful this can be pretty time comsuming 
-"-c" determine the number of comparison done for the computation of Dxy and Pi. The default is 100. This allow to avoid to perform all haplotype comparison, which is very time consuming and useless most of the time.
+Parameters:
+-g [String] The name of the file containinf the genotype
+-w [Integer] The Window size. It defines the size of the windows for analyses
+-s [Integer] The extent of the slide of windows
+-o [String] The prefix of the output files
+-t [String] Defines whether the window size is in variant number or in base pair. For variant number, use "-t variant". For base pair, use "-t bp".
+-k [Integer] Defines the maximum number of cluster that will be determined and for which the clustering score will be calculated. For instance, if "-k 6" is used, the script will output, for each window, the clustering score of k=2,k=3,k=4,k=5 and k=6  
 
-'-o' specify the prefix of the output files
+Options:
+-f [String] The clustering score to be used. By default, the clustering score used is the Davies Bouldin score. To compute the Silhouette score instead, use "-f Silhouette"
+-p [Integer] Do the clustering on p principal components instead that directly on genotype. So first the script perform a PCA, and then use p axes to do the clustering.
+-a [String or List of strings]. Additional analyses to be performed. It can include "pca", "dxy" and "pi", and any combination of these (e.g. "dxy,pca").  If "-a pca" is specified, the clustering is done on genotype, but the pca are also computed and provided as an output. If "-a dxy" is specified, the script compute Dxy between each cluster. Be careful this can be pretty time comsuming. The euclidean distance calculated by the script between all cluster give a very similare result that Dxy and is much faster to compute. If "-a pi" is specified, the script compute Pi of each cluster. Be careful this can be pretty time comsuming 
+-c [Integer] Defines the number of comparisons done for the computation of Dxy and Pi. The default is 100. This allow to avoid to perform all pairwise haplotype comparison, which is very time consuming and useless most of the time.
+-S [String] The name of the file containing the name of the individuals to use for analyses. By default, all individuals are used. The individual file must contain the name of the individual to use, each in one line.
 
 Output:
 OutputFile.ClustScore --> The clutering score (Silhouette score or davies bouldin's score) for each k, for each window 
@@ -49,6 +49,10 @@ OutputFile.pca --> The position of each sample on each pca axes, for each window
 OutputFile.cluster --> The affiliation of each sample (the cluster they belong to), for each number of cluster, for each window
 OutputFile.clusterDistance --> The euclidian distance between each cluster, for each number of cluster, for each window
 OutputFile.Dxy --> The nucleotide distance between each cluster, for each number of cluster, for each window
+
+Note: The Genotypefile.geno file should be in the format "Scaf Position GenotypeCodeSample1 GenotypeCodeSample2 ... GenotypeCodeSampleN" with genotype code being 0 for 0/0, 1 for 0/1 and 2 for 1/1 (only biallelic). All position must be genotyped (no "NA"). From a vcf file, to obtain it: 
+	1 first, impute the genotype with beagle (eg. java -Xmx20g -jar ~/Software/beagle.05May22.33a.jar  gt=data.vcf.gz out=data.imputed.vcf window=1 overlap=0.5
+	2. Transform to .geno file: python3 vcf2geno.py -i data.imputed.vcf.gz -o data.imputed.geno
 
 ////////////////////////////////////////////////
 
@@ -70,18 +74,21 @@ def main(argv):
 	global optionDXY
 	global MaxCompar 
 	global optionPI
+	global IndFile
+	global optionSubset 
 	optionPCA=False #Determine whether we perform PCA even if the clustering is based directly on genotype
 	optionDXY=False #Determine whether we perform DXY 
 	optionPI=False
+	optionSubset=False
 	Method="direct"
 	options="none"
 	ScoreFct=davies_bouldin_score
 	NoAxe=10 #Default number of pca axes used for clustering (if "-p" is specified)
 	MaxCompar=100 #Default number of comparison used for the computation of Dxy and Pi
 	try:
-		opts, args = getopt.getopt(argv,"hg:o:w:s:k:t:k:m:i:p:a:c:f:")
+		opts, args = getopt.getopt(argv,"hg:o:w:s:k:t:k:m:i:p:a:c:f:S:")
 	except getopt.GetoptError:
-		print('One of the option do not exist !\n', usage)
+		print('One of the option does not exist !\n', usage)
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '-h':
@@ -89,6 +96,9 @@ def main(argv):
 			sys.exit()
 		elif opt in ("-g"):
 			GenoFile = arg
+		elif opt in ("-S"):
+			IndFile = arg
+			optionSubset=True
 		elif opt in ("-o"):
 			OutputFile = arg
 		elif opt in ("-w"):
@@ -397,6 +407,28 @@ def Sliding_window_variant_overlap(File, WindSize, slide):
 					Inc=Inc-Slide+1 #modify the loci counter
 				End=int(new_array[1]) # Record the position of the loci (for output) #Normally not used
 
+def subset_Individual(GenoFile, IndFile):
+	textfileGenoSub = open(OutputFile+".GenoSub", "w") #create a temporary geno file to store only the genotype of the focal samples
+	with open(GenoFile) as infile: #We open the file line by line, as we are only interested in the first line
+		firstline=next(infile) #Header of the geno file
+		firstlineArr=firstline.split()
+	IndIndex=[] #Indices of the individual to keep
+	IndIndex.append(0) #Add the Scaffold name and variant position indices to the column to keep
+	IndIndex.append(1)
+	with open(IndFile) as infile: #Open the file containing the sample names of the sample to keep for analyses
+		for line in infile:
+			Ind=line.split()[0] #tricks to get only the individual name, without the '\n'
+			index =  [i for i in range(len(firstlineArr)) if firstlineArr[i] ==    Ind]	#Grep the sample index
+			IndIndex.append(int(index[0])) #Append the sample indice list
+	IndIndex.sort() #Sort the indices (just in case...)
+	with open(GenoFile) as infile: #reopen the geno file line by line
+		for line in infile:
+			linesplit=line.split() #Split the line (each value on the list correspond to the data of a sample
+			Array=[linesplit[x]	for x in IndIndex] #Keep only the value that correspond to the indices of the sample to keep
+			textfileGenoSub.write(" ".join(Array)) #write in the output file.
+			textfileGenoSub.write("\n")
+	print("subsetting samples: done !")
+			
 #### Write functions ###
 def write_clusterDistance(ClusterCenterList, WindowPos):
 	for NCluster in range(len(ClusterCenterList)): #For all number of cluster that might be considered (e.g. 2, 3, 4, and 5 if k was set to 5)
@@ -481,11 +513,19 @@ write_headerCluster()
 ### 
 
 ### Start Analyses ###
+if (optionSubset):
+	start_time = time.time()
+	subset_Individual(GenoFile, IndFile)
+	print("--- %s seconds:subsetting ---" % (time.time() - start_time))
+	GenoFile=OutputFile+".GenoSub"
+
+print(GenoFile)
 if (WindType in "variant"):
 	Sliding_window_variant_overlap(GenoFile,WindSize, Slide)
-#elif (WindType in "bp" or arg in "bp"):
 elif (WindType in "bp"):
 	Sliding_window_bp_overlap(GenoFile,WindSize, Slide)
 else:
 	print("Windows type must be 'variant' or 'bp' ")
 
+if (optionSubset):
+	os.remove(OutputFile+".GenoSub")
