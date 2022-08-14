@@ -428,6 +428,7 @@ def subset_Individual(GenoFile, IndFile):
 			textfileGenoSub.write(" ".join(Array)) #write in the output file.
 			textfileGenoSub.write("\n")
 	print("subsetting samples: done !")
+	textfileGenoSub.close()
 			
 #### Write functions ###
 def write_clusterDistance(ClusterCenterList, WindowPos):
@@ -529,3 +530,12 @@ else:
 
 if (optionSubset):
 	os.remove(OutputFile+".GenoSub")
+
+textfileClustScore.close()
+textfileCluster.close()
+textfileHetero.close()
+textfileDistance.close()
+if (Method in "pca" or optionPCA):
+	textfilepca.close()
+if (optionDXY):
+	textfileDxy.close()
