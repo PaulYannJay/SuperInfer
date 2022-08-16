@@ -20,6 +20,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.metrics import pairwise_distances
+from sklearn import mixture
 import numpy as np
 usage='''
 
@@ -161,6 +162,16 @@ def Apply_Kmeans(Input,n_cluster):
 	wt_kmeansclus = kmeans.predict(Input) #No weight
 	return wt_kmeansclus, kmeans.cluster_centers_
 
+def computeGaussianMixture(Data, MaxCluster):
+	n_components_range = range(1, 7)
+	bic=[]
+	for n_components in n_components_range:
+		gmm = mixture.GaussianMixture(n_components=n_components, covariance_type="full")
+		gmm.fit(Data)
+		bic.append(gmm.bic(Data))
+	#print(bic)
+	return bic
+
 def Define_Cluster_and_Score_WithPCA(Data, MaxCluster, ScoreFct):
 	'''
 	Calculate the silhouette score for different k on pca Output (first compute pca, then the clustering score) with k between 2 and MaxCluster (input: array of genotype or position on pca axes, Number of cluster ;output: Array of clustering score score for each k, list of cluster attribution, Position of sample on PC, Cluster centers)
@@ -171,13 +182,15 @@ def Define_Cluster_and_Score_WithPCA(Data, MaxCluster, ScoreFct):
 	ClusterCenterList=[]
 	PCAaxes=min(np.shape(Data)[1], NoAxe) #Number of PCA axis to return
 	PC=Apply_PCA(Data,PCAaxes) #Compute PCA
+	#Bic=computeGaussianMixture(PC,MaxCluster)
 	for cluster in Clusters: #For each number of cluster
 		KM, ClusterCenter=Apply_Kmeans(PC,cluster) #Kmeans and cLuster center
 		KMOut=np.append(cluster,KM) #Append the result to the list # Why using a numpy array ? To be tested
 		ClusterList.append(KMOut)#KMOut=np.concatenate((Pref,NoPc[:, None],PC), axis=1)
 		ClusterCenterList.append(ClusterCenter) #List of Cluster center
 		Score= ScoreFct(PC, KM) #Calculate the score of the clustering (by default, DBS) 
-		ScoreList.append(DBS)
+		ScoreList.append(Score)
+	#return ScoreList,ClusterList,PC,ClusterCenterList,Bic
 	return ScoreList,ClusterList,PC,ClusterCenterList
 
 
@@ -299,8 +312,10 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 			print("Fatal error: The window: ", Start, "-", Start+WindSize, " contain NaN values")
 			sys.exit()
 		if (Method in "pca"): #If the clusteting must be perform on pca output
+			#ScoreList, Cluster, PC, ClusterCenterList, Bic=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster
 			ScoreList, Cluster, PC, ClusterCenterList=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster
 			write_pca(PC, WindowPos);
+			#write_bic(Bic, WindowPos);
 		else: #Perform the clusting directly on genotype
 		#	start_time = time.time()
 			ScoreList, Cluster, ClusterCenterList=Define_Cluster_and_Score_WithoutPCA(Array,MaxCluster, ScoreFct) #Perform clustering and estimate the silhouette score for 2<=k<=6
@@ -449,6 +464,14 @@ def write_cluster(WindowPos, Cluster):
 			textfileCluster.write(str(element) + " ")
 		textfileCluster.write("\n")
 
+def write_bic(Bic, WindowPos):
+	for element in WindowPos:
+		textfileBic.write(str(element) + " ")
+	for element in Bic:
+		textfileBic.write(str(element) + " ")
+	textfileBic.write("\n")
+
+
 def write_pca(PC, WindowPos):
 	PC=PC.transpose()
 	NoPc = np.array(np.arange(1,PC.shape[0]+1))
@@ -496,6 +519,8 @@ if (optionPI):
 	textfileHetero.write(" Pi\n")
 else:
 	textfileHetero.write("\n")
+#textfileBic = open(OutputFile+".Bic", "w")
+#textfileBic.write("Scaffold Start End No.variants k1 k2 k3 k4 k5 k6\n")
 
 textfileDistance = open(OutputFile+".ClusterDistance", "w")
 textfileDistance.write("Scaffold Start End No.variants No.cluster Cluster1 Cluster2 Distance\n")
@@ -509,8 +534,6 @@ if (Method in "pca" or optionPCA):
 	textfilepca = open(OutputFilePCA, "w")
 	write_headerPCA()
 
-write_header(MaxCluster)
-write_headerCluster()
 ### 
 
 ### Start Analyses ###
@@ -520,7 +543,9 @@ if (optionSubset):
 	print("--- %s seconds:subsetting ---" % (time.time() - start_time))
 	GenoFile=OutputFile+".GenoSub"
 
-print(GenoFile)
+write_header(MaxCluster)
+write_headerCluster()
+
 if (WindType in "variant"):
 	Sliding_window_variant_overlap(GenoFile,WindSize, Slide)
 elif (WindType in "bp"):
