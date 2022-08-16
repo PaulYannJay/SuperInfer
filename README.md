@@ -22,7 +22,9 @@ Then, use:
  > python3 ../Sex_determining/code/GenotypeCluster.py -g Genotypefile\_0.2Miss.imputed.geno -w 250 -s 25 -t variant -a pca,dxy,pi -c 100 -k 5 -o Genotypefile\_0.2Miss.W250.S25 
 
 to perform all possible analyses on all individuals: Kmeans cluster, clutering score, PCA, Cluster centroid distance, Dxy, Pi, etc. In this example, the script uses 250 variant sliding windows with 225 overlap between windows (250-25 ; 25 variant slide), computes the analyses considering up to 5 clusters, and performs a maximum of 100 comparisons for calculating Pi and Dxy.
+
 To use only a subset of samples, use the -S option and provide a file containing the list of the samples to be used, one sample per line (e.g. -S ListOfSample.txt)
+
 You can perfom clustering on pca output instead than directly on genotype by using the "-p" option and providing the number of principal component to use. For instance, use "-p 5" to use perform the clustering using 5 principal components. This can be way more efficient than clutering on genotype when using large windows with a lot of samples.
 
 Note: the main script determines the clusters for a number of clusters up to k. So, if -k 5 is provided, the script splits the samples in two groups, then computes the analyses (e.g. heterozygosity) separately on these two groups of samples and outputs the result, then creates three groups, computes the analyses on these groups and outputs the result, and then do the same for four groups, and finally for five groups. The output files therefore contains a column "No.cluster", which indicate the number of clusters considered by the script for these analyses  (e.g. 2, 3, 4 or 5 if -k 5 is provided), and a column "cluster", which indicate the cluster on which analyses were performed (e.g. if the column "no.cluster" indicate "4", the column "cluster" can be 0, 1, 2 or 3).
