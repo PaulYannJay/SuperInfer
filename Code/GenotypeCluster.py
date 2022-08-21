@@ -72,6 +72,7 @@ def main(argv):
 	#global options 
 	global optionPCA
 	global ScoreFct 
+	global Score 
 	global optionDXY
 	global MaxCompar 
 	global optionPI
@@ -83,6 +84,7 @@ def main(argv):
 	optionSubset=False
 	Method="direct"
 	options="none"
+	Score="Davies_bouldin"
 	ScoreFct=davies_bouldin_score
 	NoAxe=10 #Default number of pca axes used for clustering (if "-p" is specified)
 	MaxCompar=100 #Default number of comparison used for the computation of Dxy and Pi
@@ -122,6 +124,7 @@ def main(argv):
 		elif opt in ("-f"):
 			if (arg in "Silhouette"):
 				ScoreFct = silhouette_score
+				Score="Silhouette"
 			else:
 				print("Error: the alternative score function must be 'Silhouette'\n", usage)
 				sys.exit()
@@ -331,9 +334,10 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 		if (optionDXY):
 		#	start_time = time.time()
 			Compute_Dxy(Array, WindowPos, Cluster,MaxCompar)
-		Line=np.concatenate((WindowPos,ScoreList))
+		#Line=np.concatenate((WindowPos,ScoreList))
+		Line=np.concatenate((WindowPos,[Score],ScoreList))
 	else:
-		Line=np.concatenate((WindowPos,["NA"]*(MaxCluster - 1)))
+		Line=np.concatenate((WindowPos,[Score],["NA"]*(MaxCluster - 1)))
 	for element in Line:
 		textfileClustScore.write(str(element) + " ")
 	textfileClustScore.write("\n")
@@ -483,7 +487,7 @@ def write_pca(PC, WindowPos):
 		textfilepca.write("\n")
 
 def write_header(MaxCluster):
-	textfileClustScore.write("Scaffold Start End No.variants")
+	textfileClustScore.write("Scaffold Start End No.variants Score")
 	Clusters = list(range(2,MaxCluster+1))
 	for cluster in Clusters:
 		textfileClustScore.write(" k" + str(cluster))
@@ -529,10 +533,6 @@ if (optionDXY):
 	textfileDxy = open(OutputFile+".Dxy", "w")
 	textfileDxy.write("Scaffold Start End No.variants No.cluster Cluster1 Cluster2 Dxy\n")
 
-if (Method in "pca" or optionPCA):
-	OutputFilePCA=OutputFile+".pcaResult"
-	textfilepca = open(OutputFilePCA, "w")
-	write_headerPCA()
 
 ### 
 
@@ -545,6 +545,10 @@ if (optionSubset):
 
 write_header(MaxCluster)
 write_headerCluster()
+if (Method in "pca" or optionPCA):
+	OutputFilePCA=OutputFile+".pcaResult"
+	textfilepca = open(OutputFilePCA, "w")
+	write_headerPCA()
 
 if (WindType in "variant"):
 	Sliding_window_variant_overlap(GenoFile,WindSize, Slide)
