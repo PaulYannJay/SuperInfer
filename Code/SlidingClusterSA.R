@@ -48,12 +48,18 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 
 #Sihouete Score
 Silhou=read.table(paste0(file,".ClustScore"), stringsAsFactors = F, header=T)
-SilhouLong=Silhou %>% group_by(Scaffold, Start, End) %>% pivot_longer(cols = starts_with("k"), names_to="k", values_to="Silhouette_score")
+SilhouLong=Silhou %>% group_by(Scaffold, Start, End) %>% pivot_longer(cols = starts_with("k"), names_to="k", values_to="Clust_score")
 SilhouLongSub=subset(SilhouLong, (SilhouLong$No.variants>5))
-SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)/abs(min(Silhouette_score)))/mean(Silhouette_score))
-SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=max(Silhouette_score)/abs(min(Silhouette_score)))
-SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)-abs(min(Silhouette_score)))/abs(min(Silhouette_score)))
-SilhouetteBest=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% slice_max(Silhouette_score) #Determine the best k in each window
+#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)/abs(min(Silhouette_score)))/mean(Silhouette_score))
+#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=max(Silhouette_score)/abs(min(Silhouette_score)))
+#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)-abs(min(Silhouette_score)))/abs(min(Silhouette_score)))
+if(Silhou$Score[1]=="Silhouette")
+{
+	SilhouetteBest=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% slice_max(Clust_score) #Determine the best k in each window
+} else if(Silhou$Score[1]=="Davies_bouldin")
+{
+	SilhouetteBest=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% slice_min(Clust_score) #Determine the best k in each window
+}
 SilhouetteBestNoOver=SilhouetteBest[seq(1, nrow(SilhouetteBest), 10),] #Suppress overlapping window 9 every 10 
 
 #Heterozygosity
@@ -99,14 +105,14 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
   
   base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
   SILHOUplot=base+
-    geom_line(aes(x=Start+(End-Start)/2, y=Silhouette_score, color=k))+
+    geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
     scale_color_manual(values=Col)+ 
     geom_rect(data=SilhouetteBestNoOver[SilhouetteBestNoOver$Scaffold==Scaff,], 
               aes(xmin=Start, xmax=End, 
-                  ymin=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Silhouette_score)+
-                    0.05*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Silhouette_score),
-                  ymax=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Silhouette_score)+
-                    0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Silhouette_score),
+                  ymin=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
+                    0.05*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
+                  ymax=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
+                    0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
                   fill=k), alpha=1.0)+
     scale_fill_manual(values=Col)+ 
     xlab("Position on chr")+ylab("Clustering score")+
