@@ -42,40 +42,48 @@ def main(argv):
 	print('Output file is ', GenoFile)
 
 
+def formatLine(line):
+	new_array=line.split()#Create an array from the genotype at this position (split on white space)
+	#print(new_array[0])
+	if (new_array[0].startswith('##')):
+		next
+	elif (new_array[0].startswith('#')):
+		Line=new_array[0:2] + new_array[9:len(new_array)+1]
+		for element in Line:
+			textfile.write(str(element) + " ")
+		textfile.write("\n")
+	else:
+		if "," not in new_array[4]: #Verify that the position is biallelic
+			nbIndiv=len(new_array)
+			for ind in list(range(10,nbIndiv+1)): #First individual at position 9 in vcf array
+				if (new_array[ind-1].startswith('0/0') | new_array[ind-1].startswith('0|0')):
+					new_array[ind-1]=0
+				elif (new_array[ind-1].startswith('0/1') | new_array[ind-1].startswith('0|1')| new_array[ind-1].startswith('1|0')):
+					new_array[ind-1]=1
+				elif (new_array[ind-1].startswith('1/1') | new_array[ind-1].startswith('1|1')):
+					new_array[ind-1]=2
+				elif (new_array[ind-1].startswith('./.') | new_array[ind-1].startswith('.|.')):
+					new_array[ind-1]="NaN"
+				else:
+					print(new_array[ind-1]," bug")
+			Line=new_array[0:2] + new_array[9:len(new_array)+1]
+			for element in Line:
+				textfile.write(str(element) + " ")
+			textfile.write("\n")
+
 def vcf2geno(File): #No window overlap #Need to be improved
 	'''
 	Function to read a vcf file and change the genotype format
 	'''
 	#with open(File) as infile: #Read line by line (i.e. do not load the file in memory)
-	with gzip.open(File, "rt") as infile: #Read line by line (i.e. do not load the file in memory)
-		for line in infile: #For each genotype position
-			new_array=line.split()#Create an array from the genotype at this position (split on white space)
-			#print(new_array[0])
-			if (new_array[0].startswith('##')):
-				next
-			elif (new_array[0].startswith('#')):
-				Line=new_array[0:2] + new_array[9:len(new_array)+1]
-				for element in Line:
-					textfile.write(str(element) + " ")
-				textfile.write("\n")
-			else:
-				if "," not in new_array[4]: #Verify that the position is biallelic
-					nbIndiv=len(new_array)
-					for ind in list(range(10,nbIndiv+1)): #First individual at position 9 in vcf array
-						if (new_array[ind-1].startswith('0/0') | new_array[ind-1].startswith('0|0')):
-							new_array[ind-1]=0
-						elif (new_array[ind-1].startswith('0/1') | new_array[ind-1].startswith('0|1')| new_array[ind-1].startswith('1|0')):
-							new_array[ind-1]=1
-						elif (new_array[ind-1].startswith('1/1') | new_array[ind-1].startswith('1|1')):
-							new_array[ind-1]=2
-						elif (new_array[ind-1].startswith('./.') | new_array[ind-1].startswith('.|.')):
-							new_array[ind-1]="NaN"
-						else:
-							print(new_array[ind-1]," bug")
-					Line=new_array[0:2] + new_array[9:len(new_array)+1]
-					for element in Line:
-						textfile.write(str(element) + " ")
-					textfile.write("\n")
+	if vcfFile.endswith("gz"):
+		with gzip.open(File, "rt") as infile: #Read line by line (i.e. do not load the file in memory)
+			for line in infile: #For each genotype position
+				formatLine(line)
+	else:
+		with open(File) as infile: #Read line by line (i.e. do not load the file in memory)
+			for line in infile: #For each genotype position
+				formatLine(line)
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
