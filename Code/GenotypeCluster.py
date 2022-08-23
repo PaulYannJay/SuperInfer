@@ -26,7 +26,7 @@ usage='''
 
 //////////////////////////////////////////
 Script usage:
-python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison] [-f Silhouette] [-S SampleList]
+python3 GenotypeCluster.py -g Genotypefile.geno -w WindowSize -s WindowSlide -t [variant/bp] -k MaxNumberOfCluster -o OutputFile [-p Number_of_pca] [-a pca,dxy,pi] [-c Maximum_comparison] [-f Silhouette/Davies_bouldin] [-S SampleList]
 
 Parameters:
 -g [String] The name of the file containinf the genotype
@@ -37,7 +37,7 @@ Parameters:
 -k [Integer] Defines the maximum number of cluster that will be determined and for which the clustering score will be calculated. For instance, if "-k 6" is used, the script will output, for each window, the clustering score of k=2,k=3,k=4,k=5 and k=6  
 
 Options:
--f [String] The clustering score to be used. By default, the clustering score used is the Davies Bouldin score. To compute the Silhouette score instead, use "-f Silhouette"
+-f [String] The clustering score to be used. By default, the clustering score used is the Silhouette score. To compute the Davies Bouldin score instead, use "-f Davies_bouldin"
 -p [Integer] Do the clustering on p principal components instead that directly on genotype. So first the script perform a PCA, and then use p axes to do the clustering.
 -a [String or List of strings]. Additional analyses to be performed. It can include "pca", "dxy" and "pi", and any combination of these (e.g. "dxy,pca").  If "-a pca" is specified, the clustering is done on genotype, but the pca are also computed and provided as an output. If "-a dxy" is specified, the script compute Dxy between each cluster. Be careful this can be pretty time comsuming. The euclidean distance calculated by the script between all cluster give a very similare result that Dxy and is much faster to compute. If "-a pi" is specified, the script compute Pi of each cluster. Be careful this can be pretty time comsuming 
 -c [Integer] Defines the number of comparisons done for the computation of Dxy and Pi. The default is 100. This allow to avoid to perform all pairwise haplotype comparison, which is very time consuming and useless most of the time.
@@ -84,8 +84,10 @@ def main(argv):
 	optionSubset=False
 	Method="direct"
 	options="none"
-	Score="Davies_bouldin"
-	ScoreFct=davies_bouldin_score
+	ScoreFct = silhouette_score
+	Score="Silhouette"
+	#Score="Davies_bouldin"
+	#ScoreFct=davies_bouldin_score
 	NoAxe=10 #Default number of pca axes used for clustering (if "-p" is specified)
 	MaxCompar=100 #Default number of comparison used for the computation of Dxy and Pi
 	try:
@@ -125,8 +127,11 @@ def main(argv):
 			if (arg in "Silhouette"):
 				ScoreFct = silhouette_score
 				Score="Silhouette"
+			elif (arg in "Davies_bouldin"):
+				Score="Davies_bouldin"
+				ScoreFct=davies_bouldin_score
 			else:
-				print("Error: the alternative score function must be 'Silhouette'\n", usage)
+				print("Error: the score function must be 'Silhouette' or 'Davies_bouldin'\n", usage)
 				sys.exit()
 		elif opt in ("-a"):
 			print("Option(s) used:", arg)
