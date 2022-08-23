@@ -45,6 +45,7 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 # WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
 # pcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End))  #Create a column idenfying the window
 # pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
+print("PCA: Done")
 
 #Sihouete Score
 Silhou=read.table(paste0(file,".ClustScore"), stringsAsFactors = F, header=T)
@@ -65,6 +66,8 @@ meanSlide=mean(SilhouetteBest$Start - lag(SilhouetteBest$Start), na.rm=T)
 FracOverlap=meanSlide/meanSize
 #SilhouetteBestNoOver=SilhouetteBest[seq(1, nrow(SilhouetteBest), 10),] #Suppress overlapping window 9 every 10 
 
+print("ClustScore: Done")
+
 #Heterozygosity
 Het=read.table(paste0(file, ".Hetero"), stringsAsFactors = F, header=T)
 Het3=subset(Het, Het$No.cluster==3)
@@ -72,6 +75,9 @@ HetMax=Het3 %>% group_by(Scaffold, Start, End) %>% summarise(maxHet=max(Hetero),
 HetMax$minmaxHet=HetMax$maxHet/HetMax$minHet
 Quant95=quantile(HetMax$minmaxHet, 0.95)
 HetMaxSup95=HetMax[HetMax$minmaxHet > Quant95,]
+print("Hetero: Done")
+print(HetMax)
+print(HetMaxSup95)
 
 #Dxy
 if(file.exists(paste0(file,".Dxy")))
@@ -79,12 +85,14 @@ if(file.exists(paste0(file,".Dxy")))
 	DxyData=read.table(paste0(file,".Dxy"), stringsAsFactors = F, header=T,fill=T)
 	DxyMax=DxyData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Dxy))
 	DxyMax3Clus=subset(DxyMax, DxyMax$No.cluster==3)
+	print("Dxy: Done")
 }
 
 #Cluster Distance
 DistanceData=read.table(paste0(file, ".ClusterDistance"), stringsAsFactors = F, header=T, fill=T)
 DistanceMax=DistanceData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Distance))
 DistanceMax3Clus=subset(DistanceMax, DistanceMax$No.cluster==3)
+print("Distance: Done")
 
 for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et inclure Dxy
 {
@@ -97,31 +105,34 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     theme(panel.grid.major = element_line(size = 1))+
     ThemeSobr
   
+print("PCAplot: Done")
 
+if (nrow(HetMaxSup95[HetMaxSup95$Scaffold==Scaff,])>0)
+{
   base=ggplot(HetMax[HetMax$Scaffold==Scaff,])
   HETplot=base+
     geom_hline(yintercept = Quant95, color="red3", alpha=1,linetype="dashed", size=0.1)+
     geom_line(aes(x=Start, y=minmaxHet), color=Col[1])+
-    geom_point(data=HetMaxSup95[HetMaxSup95$Scaffold==Scaff,], aes(x=Start, y=-quantile(HetMax$minmaxHet,0.5)), color="red3", shape=8, size=0.2)+
+	geom_point(data=HetMaxSup95[HetMaxSup95$Scaffold==Scaff,], aes(x=Start, y=-quantile(HetMax$minmaxHet,0.5)), color="red3", shape=8, size=0.2)+
     xlab("Position on chr")+ylab("MaxHet/MinHet")+
     ThemeSobr
-  
-#  base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
-#  SILHOUplot=base+
-#    geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
-#    scale_color_manual(values=Col)+ 
-#    geom_rect(data=SilhouetteBestNoOver[SilhouetteBestNoOver$Scaffold==Scaff,], 
-#              aes(xmin=Start, xmax=End, 
-#                  ymin=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
-#                    0.05*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
-#                  ymax=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
-#                    0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
-#                  fill=k), alpha=1.0)+
-#    scale_fill_manual(values=Col)+ 
-#    xlab("Position on chr")+ylab("Clustering score")+
-#    ThemeSobr
+ save_plot(paste0(file,".",Scaff,".png"),HETplot, nrow = 5, base_aspect_ratio = 5)
+ }
+ else
+ {
+   base=ggplot(HetMax[HetMax$Scaffold==Scaff,])
+  HETplot=base+
+    geom_hline(yintercept = Quant95, color="red3", alpha=1,linetype="dashed", size=0.1)+
+    geom_line(aes(x=Start, y=minmaxHet), color=Col[1])+
+    xlab("Position on chr")+ylab("MaxHet/MinHet")+
+    ThemeSobr
+ save_plot(paste0(file,".",Scaff,".png"),HETplot, nrow = 5, base_aspect_ratio = 5)
+ }
 
-  base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
+  
+#HETplot
+print("Heteroplot: Done")
+ base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
   SILHOUplot=base+
     geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
     scale_color_manual(values=Col)+ 
@@ -135,6 +146,7 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     scale_fill_manual(values=Col)+ 
     xlab("Position on chr")+ylab("Clustering score")+
     ThemeSobr
+print("Scoreplot: Done")
   
   base=ggplot(DistanceMax3Clus[DistanceMax3Clus$Scaffold==Scaff,])
   DISTPlot= base+
@@ -143,6 +155,8 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     theme(legend.position = "none")+
     ThemeSobr
   
+print("Distanceplot: Done")
+
   if(file.exists(paste0(file,".Dxy")))
 	{ 
 	base=ggplot(dxymax3clus[dxymax3clus$scaffold==scaff,])
@@ -151,6 +165,7 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     xlab("Position on chr")+ylab("Dxy")+
     theme(legend.position = "none")+
     ThemeSobr
+	print("Dxyplot: Done")
 	}
   
   if(file.exists(paste0(file,".Dxy")))
