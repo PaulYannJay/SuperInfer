@@ -60,7 +60,10 @@ if(Silhou$Score[1]=="Silhouette")
 {
 	SilhouetteBest=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% slice_min(Clust_score) #Determine the best k in each window
 }
-SilhouetteBestNoOver=SilhouetteBest[seq(1, nrow(SilhouetteBest), 10),] #Suppress overlapping window 9 every 10 
+meanSize=mean(SilhouetteBest$End - SilhouetteBest$Start)
+meanSlide=mean(SilhouetteBest$Start - lag(SilhouetteBest$Start), na.rm=T)
+FracOverlap=meanSlide/meanSize
+#SilhouetteBestNoOver=SilhouetteBest[seq(1, nrow(SilhouetteBest), 10),] #Suppress overlapping window 9 every 10 
 
 #Heterozygosity
 Het=read.table(paste0(file, ".Hetero"), stringsAsFactors = F, header=T)
@@ -103,17 +106,32 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     xlab("Position on chr")+ylab("MaxHet/MinHet")+
     ThemeSobr
   
+#  base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
+#  SILHOUplot=base+
+#    geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
+#    scale_color_manual(values=Col)+ 
+#    geom_rect(data=SilhouetteBestNoOver[SilhouetteBestNoOver$Scaffold==Scaff,], 
+#              aes(xmin=Start, xmax=End, 
+#                  ymin=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
+#                    0.05*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
+#                  ymax=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
+#                    0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
+#                  fill=k), alpha=1.0)+
+#    scale_fill_manual(values=Col)+ 
+#    xlab("Position on chr")+ylab("Clustering score")+
+#    ThemeSobr
+
   base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
   SILHOUplot=base+
     geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
     scale_color_manual(values=Col)+ 
-    geom_rect(data=SilhouetteBestNoOver[SilhouetteBestNoOver$Scaffold==Scaff,], 
+    geom_rect(data=SilhouetteBest[SilhouetteBest$Scaffold==Scaff,], 
               aes(xmin=Start, xmax=End, 
                   ymin=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
                     0.05*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
                   ymax=max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score)+
                     0.10*max(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,]$Clust_score),
-                  fill=k), alpha=1.0)+
+                  fill=k), alpha=FracOverlap)+
     scale_fill_manual(values=Col)+ 
     xlab("Position on chr")+ylab("Clustering score")+
     ThemeSobr
