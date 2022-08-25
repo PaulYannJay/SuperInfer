@@ -21,6 +21,9 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.metrics import pairwise_distances
 from sklearn import mixture
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.manifold import MDS
+from sklearn.manifold import TSNE
 import numpy as np
 usage='''
 
@@ -69,7 +72,6 @@ def main(argv):
 	global Slide 
 	global Method 
 	global NoAxe 
-	#global options 
 	global optionPCA
 	global ScoreFct 
 	global Score 
@@ -86,8 +88,6 @@ def main(argv):
 	options="none"
 	ScoreFct = silhouette_score
 	Score="Silhouette"
-	#Score="Davies_bouldin"
-	#ScoreFct=davies_bouldin_score
 	NoAxe=10 #Default number of pca axes used for clustering (if "-p" is specified)
 	MaxCompar=100 #Default number of comparison used for the computation of Dxy and Pi
 	try:
@@ -165,7 +165,6 @@ def Apply_Kmeans(Input,n_cluster):
 	'''
 	Function to compute k-means (input: array of genotype of n samples or array of position of sample on n pca axes, number of cluster to compute; output: array of cluster attribution for each sample, depending on n_cluster [n_cluster rows, n columns], Center of clusters)
 	'''
-	#kmeans = KMeans(n_clusters=n_cluster).fit(Input) #Effect of max_iter not properly tested
 	kmeans = KMeans(n_clusters=n_cluster).fit(Input) #Effect of max_iter not properly tested
 	wt_kmeansclus = kmeans.predict(Input) #No weight
 	return wt_kmeansclus, kmeans.cluster_centers_
@@ -190,7 +189,7 @@ def Define_Cluster_and_Score_WithPCA(Data, MaxCluster, ScoreFct):
 	ClusterCenterList=[]
 	PCAaxes=min(np.shape(Data)[1], NoAxe) #Number of PCA axis to return
 	PC=Apply_PCA(Data,PCAaxes) #Compute PCA
-	#Bic=computeGaussianMixture(PC,MaxCluster)
+	#Bic=computeGaussianMixture(PC,MaxCluster) #Could be useful in the future
 	for cluster in Clusters: #For each number of cluster
 		KM, ClusterCenter=Apply_Kmeans(PC,cluster) #Kmeans and cLuster center
 		KMOut=np.append(cluster,KM) #Append the result to the list # Why using a numpy array ? To be tested
@@ -198,7 +197,7 @@ def Define_Cluster_and_Score_WithPCA(Data, MaxCluster, ScoreFct):
 		ClusterCenterList.append(ClusterCenter) #List of Cluster center
 		Score= ScoreFct(PC, KM) #Calculate the score of the clustering (by default, DBS) 
 		ScoreList.append(Score)
-	#return ScoreList,ClusterList,PC,ClusterCenterList,Bic
+	#return ScoreList,ClusterList,PC,ClusterCenterList,Bic #Same, could be useful
 	return ScoreList,ClusterList,PC,ClusterCenterList
 
 
@@ -211,9 +210,7 @@ def Define_Cluster_and_Score_WithoutPCA(Data, MaxCluster, ScoreFct):
 	ClusterList=[]
 	ClusterCenterList=[]
 	for cluster in Clusters: #For each number of cluster
-	#	start_time = time.time()
 		KM, ClusterCenter=Apply_Kmeans(Data,cluster) #Calculate Kmean #Note that this is the time consuming step
-	#	print("--- %s seconds:Kmeans ---" % (time.time() - start_time))
 		KMOut=np.append(cluster,KM) #Store the result
 		ClusterList.append(KMOut) #List of cluster centroid
 		ClusterCenterList.append(ClusterCenter)
@@ -242,19 +239,44 @@ def Compute_Heterozygosity(Geno, WindowPos, Cluster):
 				HomoCountArray.append(CountHomo)#Append the main array with the genotype at this position
 			NoOfPosition=WindowPos[2]-WindowPos[1] #Number of site considered in this window
 			UnvariantSite=NoOfPosition-np.shape(Geno)[0] #Number of invariant site
-			#meanHetero=np.mean(HeteroCountArray)/(WindowPos[2]-WindowPos[1]) 
 			meanHetero=np.mean(HeteroCountArray)/NoOfPosition  #Mean number of heterozygous position in this cluster
-			#meanHomo=np.mean(HomoCountArray)/(WindowPos[2]-WindowPos[1])
 			meanHomo=(np.mean(HomoCountArray) + UnvariantSite)/NoOfPosition #Mean number of homozygous positions
-			#Line2write=WindowPos.append([len(myset),element,meanHetero])
 			Line2write=np.append(WindowPos,[len(myset),element,meanHetero, meanHomo])
 			for col in Line2write: #Write the result
 				textfileHetero.write(str(col) + " ")
 			if (optionPI): #If the option for calculating pi is provided
 				Pi=Compute_Pi(Geno[index_pos_list], MaxCompar)/(WindowPos[2]-WindowPos[1]) #Compute Pi
-				#Pi=Compute_Pi(GenoSub, MaxCompar)/(WindowPos[2]-WindowPos[1])
 				textfileHetero.write(str(Pi) + " ")
 			textfileHetero.write("\n")
+
+#def Compute_MDS(Geno): #Allow to compute MDS. Not useful for the moment
+#		mds=MDS(n_components=100, dissimilarity='euclidean', metric=False)
+#		pos=mds.fit(Geno)
+#		#print(pos.embedding_)
+#		#print(pos.dissimilarity_matrix_)
+#		#distance=pairwise_distances(Geno) #Calculate the pairwise euclidean distance between the cluster centroid
+#		#print(distance)
+#		return pos.embedding_
+#
+#def Compute_TSNE(Geno): #Allow to compute TSNE. Not useful for the moment
+#		tsne=TSNE(n_components=3)
+#		pos=tsne.fit(Geno)
+#		#print(pos.embedding_)
+#		#print(pos.dissimilarity_matrix_)
+#		#distance=pairwise_distances(Geno) #Calculate the pairwise euclidean distance between the cluster centroid
+#		#print(distance)
+#		return pos.embedding_
+
+#def Compute_AggloClust(Geno): Allow to cluster sample base on hierarchical clustering. Not usefull for the moment. Note: Better than k-means ???
+#		Agglo=AgglomerativeClustering(n_clusters=3, compute_distances=True)
+#		pos=Agglo.fit(Geno)
+#		print(pos.distances_)
+#		print(pos.children_)
+#		#print(pos.embedding_)
+#		#print(pos.dissimilarity_matrix_)
+#		#distance=pairwise_distances(Geno) #Calculate the pairwise euclidean distance between the cluster centroid
+#		#print(distance)
+#		#return pos.embedding_
 
 def Compute_Dxy(Geno, WindowPos, Cluster, MaxCompar):
 	''' Function to calculate Dxy. Use several tricks to fasten the calculation and made several approximation because the calculation are for unphased diploid. Could not be 100% accurate, need to be ytested. (Input: Array of genotype, WindowPosition, List of cluster attribution, Maximul number of comparison to perform; output: Directly write the result'''
@@ -263,7 +285,6 @@ def Compute_Dxy(Geno, WindowPos, Cluster, MaxCompar):
 	for line in Cluster: #For each number of cluster
 		myset= set(line) # vector of unique cluster
 		CombClust=list(combinations(myset,2)) # All comvbination of two cluster (e.g. 0-1 0-2 1-2)
-		#CombClust=combinations(myset,2)
 		for item in CombClust: #Pour chaque combination
 			index_pos_list0 = [ i for i in range(len(line)) if line[i] ==    item[0]]	#Individual in the first cluster
 			index_pos_list1 = [ i for i in range(len(line)) if line[i] ==    item[1]]	#Individual in the second cluster	
@@ -282,13 +303,12 @@ def Compute_Dxy(Geno, WindowPos, Cluster, MaxCompar):
 			for col in WindowPos:
 				textfileDxy.write(str(col) + " ")
 			textfileDxy.write(str(len(myset)) + " ")
-			#textfileDxy.write(str(item) + " ")
 			textfileDxy.write(str(item[0]) + " " + str(item[1]) + " ")
 			textfileDxy.write(str(Dxy) + " ")
 			textfileDxy.write("\n")
 
 def Compute_Pi(Geno, MaxCompar):
-	''' Function to calculate Pi. Use several tricks to fasten the calculation and made several approximation because the calculation are for unphased diploid. Could not be 100% accurate, need to be ytested. (Input: Array of genotype, Maximul number of comparison to perform; output: Pi'''
+	''' Function to calculate Pi. Use several tricks to fasten the calculation and made several approximation because the calculation are for unphased diploid. Could not be 100% accurate, need to be tested. (Input: Array of genotype, Maximul number of comparison to perform; output: Pi'''
 	PiSum=0 #To be incremented
 	myset=set(range(np.shape(Geno)[0]))
 	CombInd=list(combinations(myset,2)) # All combination of two individuals (e.g. 0-1 0-2 1-2)
@@ -320,26 +340,25 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
 			print("Fatal error: The window: ", Start, "-", Start+WindSize, " contain NaN values")
 			sys.exit()
 		if (Method in "pca"): #If the clusteting must be perform on pca output
-			#ScoreList, Cluster, PC, ClusterCenterList, Bic=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster
+			#ScoreList, Cluster, PC, ClusterCenterList, Bic=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster #When usign gaussian mixture: Not useful for the moment
 			ScoreList, Cluster, PC, ClusterCenterList=Define_Cluster_and_Score_WithPCA(Array,MaxCluster, ScoreFct) #Perform the PCA, the clustering and estimate the score for 2<=k<=MaxCluster
 			write_pca(PC, WindowPos);
 			#write_bic(Bic, WindowPos);
 		else: #Perform the clusting directly on genotype
-		#	start_time = time.time()
 			ScoreList, Cluster, ClusterCenterList=Define_Cluster_and_Score_WithoutPCA(Array,MaxCluster, ScoreFct) #Perform clustering and estimate the silhouette score for 2<=k<=6
-		#	print("--- %s seconds:Silhou ---" % (time.time() - start_time))
 			if (optionPCA): #if pca in "options', compute pca, but don't use them to compute the cluster
 				PC=Apply_PCA(Array,NoAxe)
 				write_pca(PC, WindowPos);
+#		mds1=Compute_MDS(Array) #Old test that could be useful for the future
+#		tsne1=Compute_TSNE(Array)
+#		#Compute_AggloClust(Array)
+#		write_mds(mds1, WindowPos);
+#		write_tsne(tsne1, WindowPos);
 		write_cluster(WindowPos,Cluster)
 		write_clusterDistance(ClusterCenterList, WindowPos)
-		#start_time = time.time()
 		Compute_Heterozygosity(Array, WindowPos, Cluster)
-		#print("--- %s seconds:Hete ---" % (time.time() - start_time))
 		if (optionDXY):
-		#	start_time = time.time()
 			Compute_Dxy(Array, WindowPos, Cluster,MaxCompar)
-		#Line=np.concatenate((WindowPos,ScoreList))
 		Line=np.concatenate((WindowPos,[Score],ScoreList))
 	else:
 		Line=np.concatenate((WindowPos,[Score],["NA"]*(MaxCluster - 1)))
@@ -366,7 +385,6 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 			if (new_array[0] == CurrScaffold and int(new_array[1]) <= (Start+WindSize)): #If the loci is on the same scaffold and within the current window
 				Array.append(new_array)#Append the main array with the genotype at this position
 			else: #The variant not fall in the current window. It could be on another scaffold or in a next window on the same scaffold. We write the result of the analyse for this window and move to the next window
-	#			start_time = time.time()
 				print("Current position: Scaffold=", CurrScaffold, " Position=", Start)
 				ArrayNP=np.asarray(Array) #Create a numpy array from the main array 
 				End=Start+WindSize
@@ -388,7 +406,6 @@ def Sliding_window_bp_overlap(File, WindSize, Slide):
 					Array.append(new_array) #push the first loci in the new array
 					CurrScaffold = new_array[0] #Define the new scaffold/chromosome. If the loci was on the same scaffold, this does noit change anything.
 					Start=(int(new_array[1]) // WindSize) * WindSize # Start for sliding window (not 1 or the position of the first variant).  
-	#			print("--- %s seconds:Silhou ---" % (time.time() - start_time))
 								
 def Sliding_window_variant_overlap(File, WindSize, slide): 
 	'''
@@ -409,7 +426,6 @@ def Sliding_window_variant_overlap(File, WindSize, slide):
 			new_array=line.split()#Create an array from the genotype at this position (split on white space)
 			if (new_array[0] == CurrScaffold and Inc < WindSize) : #if the focal loci is on the same scaffold as the previous one and within the same window
 				Array.append(new_array)#Append the main array with the genotype at this position
-			#	Array=np.vstack((Array,[new_array]))
 				End=int(new_array[1]) # Record the position of the loci (for output) 
 				Inc += 1 #Increment
 			else: # The focal loci in on a new scaffold or is on a new window. We write the result of the analyse for this window and move to the next window
@@ -491,6 +507,26 @@ def write_pca(PC, WindowPos):
 			textfilepca.write(str(element) + " ")
 		textfilepca.write("\n")
 
+#def write_mds(mds, WindowPos): #Used for calculated MDS and TSNE. Not useful now
+#	mds=mds.transpose()
+#	Nomds = np.array(np.arange(1,mds.shape[0]+1))
+#	Pref=np.repeat([WindowPos], mds.shape[0], axis=0)
+#	mds=np.concatenate((Pref,Nomds[:, None],mds), axis=1)
+#	for line in mds:
+#		for element in line:
+#			textfilemds.write(str(element) + " ")
+#		textfilemds.write("\n")
+#
+#def write_tsne(tsne, WindowPos):
+#	tsne=tsne.transpose()
+#	Notsne = np.array(np.arange(1,tsne.shape[0]+1))
+#	Pref=np.repeat([WindowPos], tsne.shape[0], axis=0)
+#	tsne=np.concatenate((Pref,Notsne[:, None],tsne), axis=1)
+#	for line in tsne:
+#		for element in line:
+#			textfiletsne.write(str(element) + " ")
+#		textfiletsne.write("\n")
+
 def write_header(MaxCluster):
 	textfileClustScore.write("Scaffold Start End No.variants Score")
 	Clusters = list(range(2,MaxCluster+1))
@@ -507,6 +543,24 @@ def write_headerPCA():
 		textfilepca.write(" " + str(new_array[ind]))
 	textfilepca.write("\n")
 
+#def write_headerMDS():
+#	with open(GenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
+#		header=next(infile)#Skip header 
+#		new_array=header.split()#Create an array from the genotype at this position (split on white space)
+#	textfilemds.write("Scaffold Start End No.variants Component")
+#	for ind in list(range(2,len(new_array))):
+#		textfilemds.write(" " + str(new_array[ind]))
+#	textfilemds.write("\n")
+#
+#def write_headerTSNE():
+#	with open(GenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
+#		header=next(infile)#Skip header 
+#		new_array=header.split()#Create an array from the genotype at this position (split on white space)
+#	textfiletsne.write("Scaffold Start End No.variants Component")
+#	for ind in list(range(2,len(new_array))):
+#		textfiletsne.write(" " + str(new_array[ind]))
+#	textfiletsne.write("\n")
+
 def write_headerCluster():
 	with open(GenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
 		header=next(infile)#Skip header 
@@ -516,7 +570,7 @@ def write_headerCluster():
 		textfileCluster.write(" " + str(new_array[ind]))
 	textfileCluster.write("\n")
 
-### Initiation : Create Output File###
+### Initiation : Create Output Files###
 if __name__ == "__main__":
 	main(sys.argv[1:])
 			
@@ -528,7 +582,7 @@ if (optionPI):
 	textfileHetero.write(" Pi\n")
 else:
 	textfileHetero.write("\n")
-#textfileBic = open(OutputFile+".Bic", "w")
+#textfileBic = open(OutputFile+".Bic", "w") #Used for gaussian mixture
 #textfileBic.write("Scaffold Start End No.variants k1 k2 k3 k4 k5 k6\n")
 
 textfileDistance = open(OutputFile+".ClusterDistance", "w")
@@ -554,6 +608,14 @@ if (Method in "pca" or optionPCA):
 	OutputFilePCA=OutputFile+".pcaResult"
 	textfilepca = open(OutputFilePCA, "w")
 	write_headerPCA()
+
+#OutputFileMDS=OutputFile+".MdsResult"
+#textfilemds = open(OutputFileMDS, "w")
+#write_headerMDS()
+#
+#OutputFileTSNE=OutputFile+".TsneResult"
+#textfiletsne = open(OutputFileTSNE, "w")
+#write_headerTSNE()
 
 if (WindType in "variant"):
 	Sliding_window_variant_overlap(GenoFile,WindSize, Slide)
