@@ -23,7 +23,6 @@ ThemeSobr=  theme(
   strip.text = element_text(face="bold", size=14)
 )
 
-
 #  
 Col=c("#dcad34","#bf0c14","#793e74","#11171c","#2a5d9e") #Cycliste sous la pluie, Stuart Franklin
 args = commandArgs(trailingOnly=TRUE)
@@ -34,7 +33,7 @@ pca=read.table(paste0(file,".pcaResult"), stringsAsFactors = F, header=T)
 pcaLong=pca %>% pivot_longer(cols=!c(Scaffold,Start,End,No.variants,PC), names_to="Ind", values_to="value")
 
 pcaLong1=subset(pcaLong, pcaLong$PC==1)
-#Rotate the PCA#
+#Rotate the PCA# Not usefull most of the time !
 # pcaLong1First=pcaLong1[(pcaLong1$Scaffold==pcaLong1$Scaffold[1] &
 #                           pcaLong1$Start==pcaLong1$Start[1] &
 #                           pcaLong1$End==pcaLong1$End[1]),]
@@ -45,15 +44,12 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 # WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
 # pcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End))  #Create a column idenfying the window
 # pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
-print("PCA: Done")
+print("Reading and analysing PCA output: Done")
 
 #Sihouete Score
 Silhou=read.table(paste0(file,".ClustScore"), stringsAsFactors = F, header=T)
 SilhouLong=Silhou %>% group_by(Scaffold, Start, End) %>% pivot_longer(cols = starts_with("k"), names_to="k", values_to="Clust_score")
 SilhouLongSub=subset(SilhouLong, (SilhouLong$No.variants>5))
-#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)/abs(min(Silhouette_score)))/mean(Silhouette_score))
-#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=max(Silhouette_score)/abs(min(Silhouette_score)))
-#SilhouetteDiff=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% summarise(Diff=(max(Silhouette_score)-abs(min(Silhouette_score)))/abs(min(Silhouette_score)))
 if(Silhou$Score[1]=="Silhouette")
 {
 	SilhouetteBest=SilhouLongSub %>% group_by(Scaffold,Start,End) %>% slice_max(Clust_score) #Determine the best k in each window
@@ -64,9 +60,8 @@ if(Silhou$Score[1]=="Silhouette")
 meanSize=mean(SilhouetteBest$End - SilhouetteBest$Start)
 meanSlide=mean(SilhouetteBest$Start - lag(SilhouetteBest$Start), na.rm=T)
 FracOverlap=meanSlide/meanSize
-#SilhouetteBestNoOver=SilhouetteBest[seq(1, nrow(SilhouetteBest), 10),] #Suppress overlapping window 9 every 10 
 
-print("ClustScore: Done")
+print("Reading and analysing ClustScore output: Done")
 
 #Heterozygosity
 Het=read.table(paste0(file, ".Hetero"), stringsAsFactors = F, header=T)
@@ -75,9 +70,7 @@ HetMax=Het3 %>% group_by(Scaffold, Start, End) %>% summarise(maxHet=max(Hetero),
 HetMax$minmaxHet=HetMax$maxHet/HetMax$minHet
 Quant95=quantile(HetMax$minmaxHet, 0.95)
 HetMaxSup95=HetMax[HetMax$minmaxHet > Quant95,]
-print("Hetero: Done")
-print(HetMax)
-print(HetMaxSup95)
+print("Reading and analysing Heterozygosity output: Done")
 
 #Dxy
 if(file.exists(paste0(file,".Dxy")))
@@ -85,14 +78,14 @@ if(file.exists(paste0(file,".Dxy")))
 	DxyData=read.table(paste0(file,".Dxy"), stringsAsFactors = F, header=T,fill=T)
 	DxyMax=DxyData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Dxy))
 	DxyMax3Clus=subset(DxyMax, DxyMax$No.cluster==3)
-	print("Dxy: Done")
+	print("Reading and analysing Dxy output: Done")
 }
 
 #Cluster Distance
 DistanceData=read.table(paste0(file, ".ClusterDistance"), stringsAsFactors = F, header=T, fill=T)
 DistanceMax=DistanceData %>% group_by(Scaffold, Start, End, No.cluster) %>% summarise(MaxDist=max(Distance))
 DistanceMax3Clus=subset(DistanceMax, DistanceMax$No.cluster==3)
-print("Distance: Done")
+print("Reading and analysing Distance output: Done")
 
 for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et inclure Dxy
 {
@@ -105,7 +98,7 @@ for (Scaff in unique(Het$Scaffold)) ### Not tested avec Distance ### tester et i
     theme(panel.grid.major = element_line(size = 1))+
     ThemeSobr
   
-print("PCAplot: Done")
+#print("PCAplot: Done")
 
 if (nrow(HetMaxSup95[HetMaxSup95$Scaffold==Scaff,])>0)
 {
@@ -129,9 +122,7 @@ if (nrow(HetMaxSup95[HetMaxSup95$Scaffold==Scaff,])>0)
  save_plot(paste0(file,".",Scaff,".png"),HETplot, nrow = 5, base_aspect_ratio = 5)
  }
 
-  
-#HETplot
-print("Heteroplot: Done")
+#print("Heteroplot: Done")
  base=ggplot(SilhouLongSub[SilhouLongSub$Scaffold==Scaff,])
   SILHOUplot=base+
     geom_line(aes(x=Start+(End-Start)/2, y=Clust_score, color=k))+
@@ -146,7 +137,7 @@ print("Heteroplot: Done")
     scale_fill_manual(values=Col)+ 
     xlab("Position on chr")+ylab("Clustering score")+
     ThemeSobr
-print("Scoreplot: Done")
+#print("Scoreplot: Done")
   
   base=ggplot(DistanceMax3Clus[DistanceMax3Clus$Scaffold==Scaff,])
   DISTPlot= base+
@@ -155,7 +146,7 @@ print("Scoreplot: Done")
     theme(legend.position = "none")+
     ThemeSobr
   
-print("Distanceplot: Done")
+#print("Distanceplot: Done")
 
   if(file.exists(paste0(file,".Dxy")))
 	{ 
