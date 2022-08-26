@@ -46,13 +46,13 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 # WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
 # pcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End))  #Create a column idenfying the window
 # pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
-PcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End)) 
-PcaLong1Lag=pcaLong1 %>% group_by(Ind) %>% mutate(PrevVal1=lag(value, n=1))
-PcaLong1LagDist=pcaLong1Lag %>% group_by(Scaffold, Start, End) %>% summarise(StandDist=sum(abs(value-PrevVal1)), StandDistNeg=sum(abs(value+PrevVal1)))
-PcaLong1LagDist= pcaLong1LagDist %>% mutate(WindowName= paste0(Scaffold,Start,End))
-PcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder=(if_else(StandDist>StandDistNeg, T, F)))
-PcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder2=Reorder)
-For (i in (1+1):(nrow(pcaLong1LagDist)-1))
+pcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End)) 
+pcaLong1Lag=pcaLong1 %>% group_by(Ind) %>% mutate(PrevVal1=lag(value, n=1))
+pcaLong1LagDist=pcaLong1Lag %>% group_by(Scaffold, Start, End) %>% summarise(StandDist=sum(abs(value-PrevVal1)), StandDistNeg=sum(abs(value+PrevVal1)))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(WindowName= paste0(Scaffold,Start,End))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder=(if_else(StandDist>StandDistNeg, T, F)))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder2=Reorder)
+for (i in (1+1):(nrow(pcaLong1LagDist)-1))
 {
   if(pcaLong1LagDist$Reorder[i]==T)
   {
@@ -64,7 +64,7 @@ For (i in (1+1):(nrow(pcaLong1LagDist)-1))
   }
 }
 WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
-PcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
+pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
 
 cat("Reading,analysing and rotating PCA output: Done\n")
 
