@@ -46,7 +46,28 @@ pcaLong1=subset(pcaLong, pcaLong$PC==1)
 # WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
 # pcaLong1=pcaLong1 %>% mutate(WindowName= paste0(Scaffold,Start,End))  #Create a column idenfying the window
 # pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
-cat("Reading and analysing PCA output: Done\n")
+
+pcaLong1Lag=pcaLong1 %>% group_by(Ind) %>% mutate(PrevVal1=lag(value, n=1))
+pcaLong1LagDist=pcaLong1Lag %>% group_by(Scaffold, Start, End) %>% summarise(StandDist=sum(abs(value-PrevVal1)), StandDistNeg=sum(abs(value+PrevVal1)))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(WindowName= paste0(Scaffold,Start,End))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder=(if_else(StandDist>StandDistNeg, T, F)))
+pcaLong1LagDist= pcaLong1LagDist %>% mutate(Reorder2=Reorder)
+for (i in (o+1):(nrow(pcaLong1LagDist)-1))
+{
+  print(i)
+  if(pcaLong1LagDist$Reorder[i]==T)
+  {
+
+    if(pcaLong1LagDist$Reorder[i+1]==F)
+    {pcaLong1LagDist$Reorder[i+1]=T}
+    else
+    {pcaLong1LagDist$Reorder[i+1]=F}
+  }
+}
+WindowToInvert=pcaLong1LagDist[pcaLong1LagDist$Reorder==T,]$WindowName
+pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value=-pcaLong1[pcaLong1$WindowName %in% WindowToInvert,]$value
+
+cat("Reading,analysing and rotating PCA output: Done\n")
 
 #Sihouete Score
 Silhou=read.table(paste0(file,".ClustScore"), stringsAsFactors = F, header=T)
