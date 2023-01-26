@@ -1,5 +1,5 @@
 # SuperInfer
-Scripts by Paul Jay
+Scripts by Paul Jay & Dan Jeffries
 
 SuperInfer is a collection of scripts to dissect the variation of genetic structure along the genome. Its first aim is to detect regions of the genome that may include inversion polymorphisms or supergenes, but it can be used to detect any peculiar change in population genomic structure. For instance, it can probably highlight centromeric regions and regions that have been recently introgressed.
 
