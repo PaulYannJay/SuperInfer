@@ -165,7 +165,7 @@ def Apply_Kmeans(Input,n_cluster):
 	'''
 	Function to compute k-means (input: array of genotype of n samples or array of position of sample on n pca axes, number of cluster to compute; output: array of cluster attribution for each sample, depending on n_cluster [n_cluster rows, n columns], Center of clusters)
 	'''
-	kmeans = KMeans(n_clusters=n_cluster).fit(Input) #Effect of max_iter not properly tested
+	kmeans = KMeans(n_clusters=n_cluster, n_init='auto').fit(Input) #Effect of max_iter not properly tested
 	wt_kmeansclus = kmeans.predict(Input) #No weight
 	return wt_kmeansclus, kmeans.cluster_centers_
 
