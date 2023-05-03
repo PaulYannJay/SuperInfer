@@ -3,8 +3,11 @@
 
 import sys
 import os 
+import os
+os.environ["MKL_NUM_THREADS"] = "10" 
+os.environ["NUMEXPR_NUM_THREADS"] = "10" 
+os.environ["OMP_NUM_THREADS"] = "10" 
 import getopt
-import pandas as pd
 import random
 import time
 from itertools import combinations
@@ -48,6 +51,7 @@ OutputFile.ClustScore --> The clutering score (Silhouette score or davies bouldi
 OutputFile.pca --> The position of each sample on each pca axes, for each window
 OutputFile.cluster --> The affiliation of each sample (the cluster they belong to), for each number of cluster, for each window
 OutputFile.clusterDistance --> The euclidian distance between each cluster, for each number of cluster, for each window
+OutputFile.Hetero --> The proportion of heterozygous and homozygous site (only variant) in each cluster, for each number of cluster, for each window. If "-a Pi" is provided, this file also contains the result of Pi calculation
 
 Note: The Genotypefile.geno file should be in the format "Scaf Position GenotypeCodeSample1 GenotypeCodeSample2 ... GenotypeCodeSampleN" with genotype code being 0 for 0/0, 1 for 0/1 and 2 for 1/1 (only biallelic). All position must be genotyped (no "NA"). From a vcf file, to obtain it: 
     1 first, impute the genotype with beagle (eg. java -Xmx20g -jar ~/Software/beagle.05May22.33a.jar  gt=data.vcf.gz out=data.imputed.vcf window=1 overlap=0.5
@@ -152,7 +156,6 @@ def Define_Cluster_WithPCA(Data, MaxCluster):
     PC=Apply_PCA(Data,PCAaxes) #Compute PCA
     #Bic=computeGaussianMixture(PC,MaxCluster) #Could be useful in the future
     for cluster in Clusters: #For each number of cluster
-        print(cluster)
         KM, ClusterCenter=Apply_Kmeans(PC,cluster) #Kmeans and cLuster center
         pc="1:"+str(NoAxe)
         KMOut=np.concatenate((cluster,pc,KM), axis=None)
@@ -163,7 +166,7 @@ def Define_Cluster_WithPCA(Data, MaxCluster):
         ClusterList.append(KMOut)#KMOut=np.concatenate((Pref,NoPc[:, None],PC), axis=1)
         ClusterCenterList.append(ClusterCenterAxe) #List of Cluster center
         #ClusterCenterList.append(ClusterCenter) #List of Cluster center
-    #return ScoreList,ClusterList,PC,ClusterCenterList,Bic #Same, could be useful
+            #return ScoreList,ClusterList,PC,ClusterCenterList,Bic #Same, could be useful
     return ClusterList,PC,ClusterCenterList
 
 def Define_Cluster_WithPCA_SingleAxe(Data, MaxCluster):
@@ -187,6 +190,35 @@ def Define_Cluster_WithPCA_SingleAxe(Data, MaxCluster):
             ClusterCenterList.append(ClusterCenterAxe) #List of Cluster center
     return ClusterList,PC,ClusterCenterList
 
+def Compute_Heterozygosity(Geno, WindowPos, Cluster):
+    ''' Function to estimate the number of heterozygous and homozygous site in each cluster. (Input: Array of genotype, WindowPosition, List of cluster attribution; output: Directly write the result'''
+    Cluster=np.asarray(Cluster)
+    #Cluster=Cluster[:,1:] #Grep only the genotype at each loci in the window (i.e. remove the cluster number)
+    for vec in Cluster: #For each number of cluster #line contains the cluster attribution of each sample
+        line=vec[2:] #Only genotype
+        PC=vec[1] #Axis on which analyses where computed
+        nbClust=vec[0] #Number of cluster
+        myset= set(line) # vector of unique cluster
+        for element in myset: #For each cluster
+            index_pos_list = [ i for i in range(len(line)) if line[i] ==    element] #Grep de index of the individual belonging to this cluster
+            HeteroCountArray=[] #create an empty array that will be used to store the number of heterozygous position in each individual of each cluster
+            HomoCountArray=[] #create an empty array that will be used to store the number of homozygous position in each individual of each cluster
+            for ind in index_pos_list: #For each individual
+                Count1=np.count_nonzero(Geno[ind-1]==1) #Number of Heterozygous position
+                Count2=np.count_nonzero(Geno[ind-1]==2) #Number of Homozygous derived allele
+                Count0=np.count_nonzero(Geno[ind]==0) #Number of Homozygous ancestral allele
+                CountHomo=Count0+Count2 #Number of homozygous site (among the variant site
+                HeteroCountArray.append(Count1)#Append the main array with the genotype at this position
+                HomoCountArray.append(CountHomo)#Append the main array with the genotype at this position
+            NoOfPosition=WindowPos[2]-WindowPos[1] #Number of site considered in this window
+            UnvariantSite=NoOfPosition-np.shape(Geno)[0] #Number of invariant site
+            meanHetero=np.mean(HeteroCountArray)/NoOfPosition  #Mean number of heterozygous position in this cluster
+            meanHomo=(np.mean(HomoCountArray) + UnvariantSite)/NoOfPosition #Mean number of homozygous positions
+            Line2write=np.append(WindowPos,[nbClust, PC, element,meanHetero, meanHomo])
+            for col in Line2write: #Write the result
+                textfileHetero.write(str(col) + " ")
+            textfileHetero.write("\n")
+
 
 def Compute_analyses(Array, CurrScaffold, Start, End):
     ''' This is the main fonction the call the different function to perform different analyses'''
@@ -206,6 +238,7 @@ def Compute_analyses(Array, CurrScaffold, Start, End):
         write_pca(PC, WindowPos);
         write_cluster(WindowPos,Cluster)
         write_clusterDistance(ClusterCenterList, WindowPos)
+        Compute_Heterozygosity(Array, WindowPos, Cluster)
 
 def Sliding_window_bp_overlap(File, WindSize, Slide): 
     '''
@@ -365,8 +398,8 @@ if __name__ == "__main__":
             
 #textfileClustScore = open(OutputFile+".ClustScore", "w")
 textfileCluster = open(OutputFile+".cluster", "w")
-#textfileHetero = open(OutputFile+".Hetero", "w")
-#textfileHetero.write("Scaffold Start End No.variants No.cluster Cluster Hetero Homo")
+textfileHetero = open(OutputFile+".Hetero", "w")
+textfileHetero.write("Scaffold Start End No.variants No.cluster Axes Cluster Hetero Homo\n")
 textfileDistance = open(OutputFile+".ClusterDistance", "w")
 textfileDistance.write("Scaffold Start End No.variants Axes No.cluster Cluster1 Cluster2 Distance\n")
 
@@ -394,6 +427,6 @@ else:
 
 #textfileClustScore.close()
 textfileCluster.close()
-#textfileHetero.close()
+textfileHetero.close()
 textfileDistance.close()
 textfilepca.close()
