@@ -30,17 +30,15 @@ usage='''
 
 //////////////////////////////////////////
 Script usage:
-python3 AssociationTest.py -g Genotypefile.geno -p PhenotypeFile -o OutputFile [-S SampleList]  [-s startPos -e endPos]
+python3 ComputeHetero.py -g Genotypefile.geno -o OutputFile -p PositionFile -s SampleFile ]
 
 Parameters:
 -g [String] The name of the file containinf the genotype
+-p [String] The name of the file containing the region to analyse 
 -o [String] The prefix of the output files
--p [String] The name of the file containing the phenotype
 
 Options:
--S [String] The name of the file containing the name of the individuals to use for analyses. By default, all individuals are used. The individual file must contain the name of the individual to use, each in one line.
--s Start position in the scaffold to analyse
--e End position in the scaffold to analyse
+-s [String] The name of the file containing the name of the individuals to use for analyses. By default, all individuals are used. The individual file must contain the name of the individual to use, each in one line.
 
 
 Output:
@@ -57,16 +55,12 @@ Note: The Genotypefile.geno file should be in the format "Scaf Position Genotype
 def main(argv):
     global GenoFile
     global OutputFile
-    global PhenoFile
     global IndFile
-    global StartPos 
-    global EndPos 
+    global PosFile
     global optionSubset 
-    global optionSubsetPos 
     optionSubset=False
-    optionSubsetPos=False
     try:
-        opts, args = getopt.getopt(argv,"hg:o:p:s:e:")
+        opts, args = getopt.getopt(argv,"hg:o:p:s:")
     except getopt.GetoptError:
         print('One of the option does not exist !\n', usage)
         sys.exit(2)
@@ -76,153 +70,103 @@ def main(argv):
             sys.exit()
         elif opt in ("-g"):
             GenoFile = arg
-        elif opt in ("-p"):
-            PhenoFile = arg
-        elif opt in ("-S"):
+        elif opt in ("-s"):
             IndFile = arg
             optionSubset=True
         elif opt in ("-o"):
             OutputFile = arg
-        elif opt in ("-s"):
-            StartPos = arg
-            optionSubsetPos=True
-        elif opt in ("-e"):
-            EndPos = arg
-            optionSubsetPos=True
+        elif opt in ("-p"):
+            PosFile = arg
     print('Input file is ', GenoFile)
     print('Output file is ', OutputFile)
-
-def cramers_V(var1,var2) :
-      #dataset=np.vstack((var1, var2))
-      #print(dataset)
-      ContTab=stats.contingency.crosstab(var1, var2) #Get a contingency table from the genotype array and the phenotype array
-      X2 = stats.chi2_contingency(ContTab.count, correction=False)[0] #Calculate chi2
-      N = np.sum(ContTab.count) #Number of sample
-      minimum_dimension = min(ContTab.count.shape)-1  #minimum number of dim
-      result = np.sqrt((X2/N) / minimum_dimension) #Cramer's V
-      return result
-  
-def Perform_CramerV_Association(File, Pheno):
-    with open(File) as infile: #Read line by line (i.e. do not load the file in memory)
-        next(infile)#Skip header 
-        for line in infile: #For each genotype position
-            lineArr=line.split()
-            Scaff=lineArr[0] #Svaffold
-            Pos=lineArr[1] #Position
-            GenoArray=np.asarray(lineArr[2:])#Create an array from the genotype at this position (split on white space)
-            result=cramers_V(GenoArray, Pheno) #Perform the analyses
-            Outfile.write(Scaff+" "+ Pos+" "+ str(result)) #Write the output
-            Outfile.write("\n")
-            
-
-
-
-### Initiation : Create Output Files###
-if __name__ == "__main__":
-    main(sys.argv[1:])
-            
-#textfileClustScore = open(OutputFile+".ClustScore", "w")
-#textfileCluster = open(OutputFile+".cluster", "w")
-#textfileHetero = open(OutputFile+".Hetero", "w")
-#textfileHetero.write("Scaffold Start End No.variants No.cluster Cluster Hetero Homo")
-#if (optionPI):
-#    textfileHetero.write(" Pi\n")
-#else:
-#    textfileHetero.write("\n")
-##textfileBic = open(OutputFile+".Bic", "w") #Used for gaussian mixture
-##textfileBic.write("Scaffold Start End No.variants k1 k2 k3 k4 k5 k6\n")
-#
-#textfileDistance = open(OutputFile+".ClusterDistance", "w")
-#textfileDistance.write("Scaffold Start End No.variants No.cluster Cluster1 Cluster2 Distance\n")
-#
-#if (optionDXY):
-#    textfileDxy = open(OutputFile+".Dxy", "w")
-#    textfileDxy.write("Scaffold Start End No.variants No.cluster Cluster1 Cluster2 Dxy\n")
-
-def GetPheno(PhenoFile, GenoFile):
-    with open(GenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
-        first=next(infile)#Skip header 
-        header=first.split()
-    NbSample=len(header)-2
-    print(NbSample)
-    Pheno=np.zeros(NbSample)
-    Ind=0
-    with open(PhenoFile) as infile: #Read line by line (i.e. do not load the file in memory)
-        next(infile) #skip header
-        for line in infile:
-            IndLine=line.split() #tricks to get only the individual name, without the '\n'
-            index =  [i for i in range(len(header)) if header[i] ==    IndLine[0]]    #Grep the sample index
-            Pheno[index[0]-2]=IndLine[1]
-    return Pheno
-
-    #with open(PhenoFile)
+           
+def computeHetero(GenoFile, Column): #Function to compute the number of heterozygous position for each sample
+    Geno=np.loadtxt(GenoFile, skiprows=0, usecols=Column ) #Open the genotype file (only the predefined colum (i.e. Samples)
+    nPos=np.size(Geno, axis=0) #Get the number of position genotyped
+    Count1=np.count_nonzero(Geno==1, axis=0) #COunt the number of occurence of '1'
+    return nPos, Count1
 
 def subset_Individual(GenoFile, IndFile):
-    textfileGenoSub = open(OutputFile+".GenoSub", "w") #create a temporary geno file to store only the genotype of the focal samples
     with open(GenoFile) as infile: #We open the file line by line, as we are only interested in the first line
         firstline=next(infile) #Header of the geno file
         firstlineArr=firstline.split()
+        secondline=next(infile) #First line of data (used to get the name of the chromosome analsed
+        secondlineArr=secondline.split()
     IndIndex=[] #Indices of the individual to keep
-    IndIndex.append(0) #Add the Scaffold name and variant position indices to the column to keep
-    IndIndex.append(1)
     with open(IndFile) as infile: #Open the file containing the sample names of the sample to keep for analyses
         for line in infile:
             Ind=line.split()[0] #tricks to get only the individual name, without the '\n'
             index =  [i for i in range(len(firstlineArr)) if firstlineArr[i] ==    Ind]    #Grep the sample index
             IndIndex.append(int(index[0])) #Append the sample indice list
     IndIndex.sort() #Sort the indices (just in case...)
-    with open(GenoFile) as infile: #reopen the geno file line by line
+    chrom=secondlineArr[0]
+    return IndIndex, chrom  #IndIndex contain the index of the position of the samples to be analysed
+
+
+def getNumberSample_And_Chrom(GenoFile): #Function to extract the number of samples and the focal chromosome
+    with open(GenoFile) as infile: #We open the file line by line, as we are only interested in the first line
+        firstline=next(infile) #Header of the geno file
+        firstlineArr=firstline.split()
+        secondline=next(infile)
+        secondlineArr=secondline.split()
+    IndIndex=range(2, len(firstlineArr)) #Create a sequence containing the index of the sample to analyse
+    chrom=secondlineArr[0]
+    return IndIndex, chrom 
+
+def subset_Pos(GenoFile, StartPos, EndPos): #Function to subset the geno file to only analyse interesting position
+    textfileGenoSub = open(OutputFile+"."+StartPos+"-"+EndPos+".geno", "w") #create a temporary geno file to store only the genotypes at the focal position 
+    with open(GenoFile) as infile: #open the geno file line by line
         for line in infile:
             linesplit=line.split() #Split the line (each value on the list correspond to the data of a sample
-            Array=[linesplit[x]    for x in IndIndex] #Keep only the value that correspond to the indices of the sample to keep
-            textfileGenoSub.write(" ".join(Array)) #write in the output file.
-            textfileGenoSub.write("\n")
-    print("subsetting samples: done !")
+            if (linesplit[1] > StartPos and linesplit[1] < EndPos): #Only keep position that fall within the fical position
+                textfileGenoSub.write(line) #write in the temp file.
+                textfileGenoSub.write("\n")
     textfileGenoSub.close()
 
+def writeOutputHeader(GenoFile, Column): 
+    with open(GenoFile) as infile: #We open the file line by line, as we are only interested in the first line
+        firstline=next(infile) #Header of the geno file
+        firstlineArr=firstline.split()
+        Array=[firstlineArr[x]    for x in Column] #Keep only the value that correspond to the indices of the sample to keep
+    Output.write(" ".join([str(firstlineArr[0]),"Start","End","nPos"])+ " ") 
+    Output.write(" ".join(Array)+"\n")
+
+def writeOutput(nPos, Count1, StartPos, EndPos): #write the output
+    Output.write(" ".join([chrom,str(StartPos),str(EndPos),str(nPos)])) 
+    for i in Count1: #Count1 contain the number of hetero position for each sample
+        Output.write(" "+str(i))
+    Output.write("\n")
+
+
+
 ### 
+### Initiation : Create Output Files###
+if __name__ == "__main__":
+    main(sys.argv[1:])
+GenoFileOriginal=GenoFile #Copy the name of the original genofile
+Output = open(OutputFile+".SampleHetero", "w")
 
 ### Start Analyses ###
 if (optionSubset):
     start_time = time.time()
-    subset_Individual(GenoFile, IndFile)
-    print("--- %s seconds:subsetting ---" % (time.time() - start_time))
-    GenoFile=OutputFile+".GenoSub"
+    Column, chrom=subset_Individual(GenoFile, IndFile) #Get the index of the sample to use
+    print("--- %s seconds:subsetting samples---" % (time.time() - start_time))
+else:
+    Column, chrom=getNumberSample_And_Chrom(GenoFile)
 
+writeOutputHeader(GenoFileOriginal, Column)
 
-Outfile = open(OutputFile+".CramersV", "w")
-Pheno=GetPheno(PhenoFile, GenoFile)
-Perform_CramerV_Association(GenoFile, Pheno)
-#write_header(MaxCluster)
-#write_headerCluster()
-#if (Method in "pca" or optionPCA):
-#    OutputFilePCA=OutputFile+".pcaResult"
-#    textfilepca = open(OutputFilePCA, "w")
-#    write_headerPCA()
+with open(PosFile) as infile: #We open the position file line by line
+   for line in infile: #For each tupple of position
+        linesplit=line.split() #Split the line (value on the list correspond to the start and end position
+        StartPos=(linesplit[0])
+        EndPos=(linesplit[1])
+        print(line)
+        #start_time = time.time()
+        subset_Pos(GenoFileOriginal, StartPos, EndPos) 
+        #print("--- %s seconds:subsetting positions---" % (time.time() - start_time))
+        GenoFile=OutputFile+"."+StartPos+"-"+EndPos+".geno"
+        nPos, Count1=computeHetero(GenoFile, Column)
+        writeOutput(nPos, Count1, StartPos, EndPos)
+        os.remove(OutputFile+"."+StartPos+"-"+EndPos+".geno")
 
-#OutputFileMDS=OutputFile+".MdsResult"
-#textfilemds = open(OutputFileMDS, "w")
-#write_headerMDS()
-#
-#OutputFileTSNE=OutputFile+".TsneResult"
-#textfiletsne = open(OutputFileTSNE, "w")
-#write_headerTSNE()
-
-#if (WindType in "variant"):
-#    Sliding_window_variant_overlap(GenoFile,WindSize, Slide)
-#elif (WindType in "bp"):
-#    Sliding_window_bp_overlap(GenoFile,WindSize, Slide)
-#else:
-#    print("Windows type must be 'variant' or 'bp' ")
-
-if (optionSubset):
-    os.remove(OutputFile+".GenoSub")
-
-#textfileClustScore.close()
-#textfileCluster.close()
-#textfileHetero.close()
-#textfileDistance.close()
-#if (Method in "pca" or optionPCA):
-#    textfilepca.close()
-#if (optionDXY):
-#    textfileDxy.close()
