@@ -4,7 +4,6 @@
 import sys
 import os 
 import getopt
-import pandas as pd
 import random
 import time
 import scipy.stats as stats
