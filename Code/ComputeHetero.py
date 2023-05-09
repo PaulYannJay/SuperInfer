@@ -80,7 +80,7 @@ def main(argv):
     print('Output file is ', OutputFile)
            
 def computeHetero(GenoFile, Column): #Function to compute the number of heterozygous position for each sample
-    Geno=np.loadtxt(GenoFile, skiprows=0, usecols=Column ) #Open the genotype file (only the predefined colum (i.e. Samples)
+    Geno=np.loadtxt(GenoFile, skiprows=0) #Open the genotype file (only the predefined colum (i.e. Samples)
     nPos=np.size(Geno, axis=0) #Get the number of position genotyped
     Count1=np.count_nonzero(Geno==1, axis=0) #COunt the number of occurence of '1'
     return nPos, Count1
@@ -111,7 +111,7 @@ def getNumberSample_And_Chrom(GenoFile): #Function to extract the number of samp
     IndIndex=range(2, len(firstlineArr)) #Create a sequence containing the index of the sample to analyse
     chrom=secondlineArr[0]
     return IndIndex, chrom 
-
+############ Not used anymore #######################""""
 def subset_Pos(GenoFile, StartPos, EndPos): #Function to subset the geno file to only analyse interesting position
     textfileGenoSub = open(OutputFile+"."+StartPos+"-"+EndPos+".geno", "w") #create a temporary geno file to store only the genotypes at the focal position 
     with open(GenoFile) as infile: #open the geno file line by line
@@ -121,6 +121,7 @@ def subset_Pos(GenoFile, StartPos, EndPos): #Function to subset the geno file to
                 textfileGenoSub.write(line) #write in the temp file.
                 textfileGenoSub.write("\n")
     textfileGenoSub.close()
+#######################################################
 
 def writeOutputHeader(GenoFile, Column): 
     with open(GenoFile) as infile: #We open the file line by line, as we are only interested in the first line
@@ -137,7 +138,18 @@ def writeOutput(nPos, Count1, StartPos, EndPos): #write the output
     Output.write("\n")
 
 
+def CreateSubSetGenoFiles(PosFile, GenoFile, Column): #FUnction to create subset of geno file
+    Position=np.loadtxt(PosFile)
+    SortPos=np.sort(Position, axis=0)
+    Pos=0
+    Geno=np.loadtxt(GenoFile, skiprows=1, usecols=Column, dtype=int)
+    Pos=np.loadtxt(GenoFile, skiprows=1, usecols=1)
+    for i in Position:
+        PosInd=np.where((Pos>i[0]) & (Pos<i[1]))
+        GenoSub=Geno[PosInd]
+        np.savetxt(OutputFile+"."+str(int(i[0]))+"-"+str(int(i[1]))+".geno", GenoSub, fmt='%d') #        GenoSub=Geno[Geno[0, with open(GenoFile, 'r') as infile: #open the geno file line by line
 
+#'
 ### 
 ### Initiation : Create Output Files###
 if __name__ == "__main__":
@@ -154,17 +166,14 @@ else:
     Column, chrom=getNumberSample_And_Chrom(GenoFile)
 
 writeOutputHeader(GenoFileOriginal, Column)
-
+CreateSubSetGenoFiles(PosFile, GenoFile, Column) #For each position, create first the subsetted array
 with open(PosFile) as infile: #We open the position file line by line
    for line in infile: #For each tupple of position
         linesplit=line.split() #Split the line (value on the list correspond to the start and end position
         StartPos=(linesplit[0])
         EndPos=(linesplit[1])
         print(line)
-        #start_time = time.time()
-        subset_Pos(GenoFileOriginal, StartPos, EndPos) 
-        #print("--- %s seconds:subsetting positions---" % (time.time() - start_time))
-        GenoFile=OutputFile+"."+StartPos+"-"+EndPos+".geno"
+        GenoFile=OutputFile+"."+StartPos+"-"+EndPos+".geno" #The name of the subsetted array containing the genotype at this position
         nPos, Count1=computeHetero(GenoFile, Column)
         writeOutput(nPos, Count1, StartPos, EndPos)
         os.remove(OutputFile+"."+StartPos+"-"+EndPos+".geno")
