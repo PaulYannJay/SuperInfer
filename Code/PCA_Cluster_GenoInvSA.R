@@ -6,7 +6,6 @@ library(tidyr, warn.conflicts = F, quietly = T)
 options(dplyr.summarise.inform = FALSE)
 args = commandArgs(trailingOnly=TRUE)
 filepca=args[1]
-filepca="~/Projects/SuperInfer/Human/1000Gen/PJL.w750.s75.p3.k3"
 pca=read.table(paste0(filepca, ".pcaResult"), header=T, stringsAsFactors = F)
 Cluster=read.table(paste0(filepca, ".cluster"), header=T, stringsAsFactors = F)
 pcaLong=pca[pca$PC==1,] %>% pivot_longer(cols=!c(Scaffold,Start,End,No.variants,PC), names_to="Ind", values_to="value") #Make long data
